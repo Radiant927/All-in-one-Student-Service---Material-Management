@@ -128,38 +128,133 @@ code .
 
 > 如果 `code` 命令不可用：打开 VS Code → `Ctrl+Shift+P` → 输入 `Shell Command: Install 'code' command in PATH` → 回车安装。
 
-### 日常开发流程
+### 日常开发流程（从写代码到合并，完整 10 步）
 
-**重要：永远不要直接在 main 分支上改代码。**
+**核心规则：永远不要直接在 main 分支上改代码。**
+
+整个流程分两个阶段：**本地操作**（在你电脑上完成）和 **GitHub 网页操作**（在浏览器完成）。
+
+---
+
+#### 新手必读：分支 vs main，到底有什么区别？
+
+你可以把 Git 仓库想象成一棵树：
+
+```
+main 分支（主干）          ← 团队所有已确认的、稳定的代码在这里
+│
+├── feature/xxx 分支       ← 你从这里分出来，只改你自己的功能
+├── fix/xxx 分支           ← 队友从这里分出来，只修他自己的 bug
+└── feature/yyy 分支       ← 另一个队友的功能分支
+```
+
+- **main 是唯一的真相来源** — 所有人最终合并到这里，它代表"当前线上运行的版本"
+- **分支是你的私人工作区** — 你从 main 分出来一条岔路，在这上面随便改，不会影响 main，也不会影响别人的代码
+- **PR 就是把你的岔路合并回主干** — 别人 review 确认没问题后，你的代码才真正进入 main
+
+| | 在 main 上直接 commit | 在分支上 commit |
+|---|---|---|
+| 影响范围 | 立刻影响所有人 | 只影响你自己的分支 |
+| 别人能 review 吗？ | 不能，直接生效 | 能，通过 PR |
+| 改错了怎么办？ | 很难回退，影响团队 | 删掉分支重来即可 |
+| 应该这样做吗？ | **绝对不要** | **这才是正确姿势** |
+
+> 一句话：**你的每一次 commit 都是在分支上进行的，永远不要 commit 到 main。** main 只通过 PR 合并来更新。
+
+**如果你已经在 main 上改了代码怎么办？**
 
 ```bash
-# 第一步：确保在 main 分支，拉取最新代码
+# 别慌，先不要 commit。执行下面三步：
+git stash                    # 把你改的代码暂存起来
+git checkout -b feature/xxx  # 创建新分支
+git stash pop                # 把代码恢复到新分支上
+```
+
+---
+
+#### 阶段一：本地操作（步骤 1-7，在你的电脑/VSCode 里完成）
+
+```bash
+# 步骤 1：切换到 main 分支
 git checkout main
+
+# 步骤 2：拉取最新代码（确保你和团队进度同步）
 git pull origin main
 
-# 第二步：从 main 创建自己的功能分支（分支名用英文，见名知意）
-git checkout -b feature/warehouse-view
+# 步骤 3：从 main 创建你自己的功能分支
+# 分支名用英文短横线连接，说清楚你要做什么，比如：
+git checkout -b feature/warehouse-view    # 新功能
+git checkout -b fix/inventory-count       # 修 bug
+git checkout -b docs/update-readme        # 改文档
 
-# 第三步：改代码...
+# 步骤 4：改代码...（在 VSCode 里正常写代码、保存）
 
-# 第四步：查看改了哪些文件
+# 步骤 5：看看你改了哪些文件（这个步骤只是确认，可以不执行）
 git status
 
-# 第五步：把修改添加到暂存区
-git add .                    # 添加所有修改
-# 或者逐个添加：
-git add src/components/WarehouseView.vue
+# 步骤 6：把所有修改添加到暂存区
+git add .
 
-# 第六步：提交（commit message 用中文或英文，说清楚改了什么）
+# 步骤 7：提交到本地仓库，写清楚你改了什么
 git commit -m "feat: 新增主仓库和回收仓分仓视图"
+```
 
-# 第七步：推送到 GitHub
+> 到这里为止，你的修改还**只在你自己的电脑上**，GitHub 上什么都没有。
+
+```bash
+# 步骤 8：推送到 GitHub（把本地修改上传到云端）
 git push origin feature/warehouse-view
 ```
 
-### 提交信息规范
+> 终端会输出一堆信息，看到类似 `remote: Create a pull request...` 的链接就说明推送成功了。
 
-建议统一格式，方便以后翻历史：
+---
+
+#### 阶段二：GitHub 网页操作（步骤 9-10，在浏览器里完成）
+
+> **push 只是把代码传上去了，不等于提交了 PR！** 必须去 GitHub 网页手动创建 PR，仓库管理员才能看到你的改动。
+
+**步骤 9：创建 Pull Request**
+
+1. 打开浏览器，进入你的 GitHub 仓库页面
+2. 你会看到页面顶部有一个**黄色的提示条**，写着你的分支名和 **"Compare & pull request"** 绿色按钮 → **直接点它**
+3. 如果没看到黄色提示条，手动操作：
+   - 点击页面上方的 **Pull requests** 标签
+   - 点击绿色的 **New pull request** 按钮
+   - `base` 选 **main**（意思是"我要合并到这里"）
+   - `compare` 选你的分支（意思是"这是我的改动"）
+   - 点击绿色的 **Create pull request**
+4. 在标题和描述里写清楚你改了什么、为什么这样改
+5. 点击页面下方的 **Create pull request** 提交
+
+**步骤 10：等待 Review 和合并**
+
+1. PR 创建好后，在团队群里发链接，让大家 review
+2. 如果有人提了修改建议，你在本地分支继续改 → `git add .` → `git commit` → `git push`，PR 会自动更新
+3. 至少一个人点 **Approve** 后，点击 **Merge pull request** → **Confirm merge** 合并到 main
+4. 合并完成后，GitHub 会提示 **"Delete branch"**，点一下删掉远程分支，保持仓库整洁
+
+---
+
+#### 一张图总结
+
+```
+你的电脑                          GitHub 云端
+─────────                        ──────────
+git checkout -b xxx    ─→        创建了新分支
+写代码改代码...
+git add .
+git commit -m "xxx"   ─→        提交记录保存在本地
+git push               ─→        分支和代码上传到云端
+                                 ↓
+浏览器打开 GitHub ──→ 点击 "Compare & pull request"  ──→  创建 PR
+                                 ↓
+                              队友 review → Approve → Merge → 代码进入 main ✅
+```
+
+> 这一步很多人会漏：**push 之后一定要去 GitHub 网页手动创建 PR**。不创建 PR，仓库管理员就看不到你的改动，代码永远进不了 main。
+
+### 提交信息规范
 
 ```
 feat: 新增xxx功能
@@ -168,16 +263,6 @@ refactor: 重构xxx模块
 docs: 更新文档
 style: 样式调整
 ```
-
-### 发起 Pull Request（PR）
-
-1. 推送成功后，打开 GitHub 仓库页面，会看到黄色的提示条，点击 **Compare & pull request**
-2. 如果没有提示条，手动操作：点击 **Pull requests** 标签 → **New pull request** → base 选 `main`，compare 选你的分支
-3. 填写 PR 标题和描述，说清楚改了什么、为什么这样改
-4. 点击 **Create pull request**
-5. 在群里通知其他人 review
-6. **至少一人 review 通过后**，由仓库管理员或你自己点击 **Merge pull request** 合并到 main
-7. 合并后删除远程分支（GitHub 上会提示按钮）
 
 ### VS Code 图形化操作（不喜欢命令行的看这里）
 
