@@ -13,7 +13,9 @@
             class="form-input" type="password" v-model="password"
             placeholder="管理员密码" @keydown.enter="login">
           <p class="password-error" :class="{ visible: errorVisible }">⚠️ 密码错误，请重试</p>
-          <button class="btn-primary" @click="login" style="margin-top:6px;">验证登录</button>
+          <button class="btn-primary" @click="login" :disabled="loggingIn" style="margin-top:6px;">
+            {{ loggingIn ? '验证中...' : '验证登录' }}
+          </button>
           <p class="hint">默认密码: admin888</p>
         </div>
         <div v-else>
@@ -22,16 +24,16 @@
             <div class="admin-material-name">
               {{ m.icon }} {{ m.name }}
               <span class="admin-info">
-                <template v-if="m.hasIndividualTracking">
-                  (共{{ m.items?.length || 0 }}个, 剩余{{ getRemaining(m) }}, 已借出{{ m.borrowedQuantity || 0 }})
+                <template v-if="m.has_individual_tracking">
+                  (共{{ m.totalQuantity || 0 }}个, 剩余{{ getRemaining(m) }}, 已借出{{ m.borrowedQuantity || 0 }})
                 </template>
                 <template v-else>
                   (剩余: {{ getRemaining(m) }})
                 </template>
               </span>
             </div>
-            <p v-if="m.hasIndividualTracking" class="tip">💡 通过管理页面添加/删除遥控器代号来调整数量</p>
-            <div v-if="!m.hasIndividualTracking" class="admin-row">
+            <p v-if="m.has_individual_tracking" class="tip">💡 通过管理页面添加/删除遥控器代号来调整数量</p>
+            <div v-if="!m.has_individual_tracking" class="admin-row">
               <label>总数量</label>
               <input type="number" v-model.number="editValues[m.id].total" :min="m.borrowedQuantity || 0">
               <button class="btn-save-admin" @click="$emit('save-total', m.id, editValues[m.id].total)">保存</button>
@@ -42,6 +44,13 @@
               <button class="btn-save-admin" @click="$emit('save-threshold', m.id, editValues[m.id].threshold)">保存</button>
             </div>
           </div>
+
+          <h3 style="margin-top:20px;">🔧 工具</h3>
+          <div class="admin-tools">
+            <button class="btn-tool" @click="$emit('toggle-locations')">📍 储位管理</button>
+            <button class="btn-tool" @click="$emit('toggle-import')">📥 导入 Excel</button>
+          </div>
+
           <button class="btn-logout" @click="$emit('logout')">🚪 退出管理</button>
         </div>
       </div>
@@ -58,10 +67,11 @@ const props = defineProps({
   materials: Array
 })
 
-const emit = defineEmits(['close', 'login', 'logout', 'save-total', 'save-threshold'])
+const emit = defineEmits(['close', 'login', 'logout', 'save-total', 'save-threshold', 'toggle-locations', 'toggle-import'])
 
 const password = ref('')
 const errorVisible = ref(false)
+const loggingIn = ref(false)
 
 const editValues = reactive({})
 
@@ -69,6 +79,7 @@ watch(() => props.visible, (v) => {
   if (v) {
     password.value = ''
     errorVisible.value = false
+    loggingIn.value = false
     props.materials.forEach(m => {
       editValues[m.id] = {
         total: m.totalQuantity || 0,
@@ -78,14 +89,16 @@ watch(() => props.visible, (v) => {
   }
 })
 
-function login() {
+async function login() {
+  loggingIn.value = true
   emit('login', password.value)
   errorVisible.value = true
   setTimeout(() => { errorVisible.value = false }, 1500)
+  setTimeout(() => { loggingIn.value = false }, 500)
 }
 
 function getRemaining(m) {
-  if (m.hasIndividualTracking && m.items) {
+  if (m.has_individual_tracking && m.items) {
     return m.items.filter(i => i.status === 'available').length
   }
   return Math.max(0, (m.totalQuantity || 0) - (m.borrowedQuantity || 0))
@@ -141,6 +154,13 @@ function getRemaining(m) {
   font-weight: 600; cursor: pointer; transition: all 0.3s; white-space: nowrap;
 }
 .btn-save-admin:hover { background: #4c63d2; }
+.admin-tools { display: flex; gap: 10px; margin-bottom: 16px; }
+.btn-tool {
+  flex: 1; padding: 10px; border-radius: 10px; border: 1.5px solid #dde4ed;
+  background: #fff; cursor: pointer; font-size: 0.84rem;
+  font-weight: 600; color: #5a6b7d; transition: all 0.3s;
+}
+.btn-tool:hover { border-color: #667eea; color: #667eea; background: #f8faff; }
 .btn-logout {
   margin-top: 16px; width: 100%; padding: 10px;
   border-radius: 10px; border: 1.5px solid #dde4ed;
@@ -162,4 +182,5 @@ function getRemaining(m) {
   transition: all 0.3s;
 }
 .btn-primary:hover { box-shadow: 0 6px 22px rgba(102,126,234,0.45); transform: translateY(-1px); }
+.btn-primary:disabled { background: #ccd0d8; box-shadow: none; cursor: not-allowed; transform: none; }
 </style>

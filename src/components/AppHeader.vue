@@ -5,13 +5,15 @@
       <h1>一站式物资管理系统</h1>
     </div>
     <div class="header-actions">
+      <button class="btn-icon" @click="$emit('toggle-archive')" title="物资档案">📋</button>
+      <button class="btn-icon" @click="$emit('toggle-import')" title="导入数据">📥</button>
       <button class="btn-icon" @click="$emit('toggle-admin')" title="管理员设置">⚙️</button>
     </div>
   </header>
 </template>
 
 <script setup>
-defineEmits(['toggle-admin'])
+defineEmits(['toggle-admin', 'toggle-archive', 'toggle-import'])
 </script>
 
 <style scoped>
