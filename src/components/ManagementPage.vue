@@ -54,7 +54,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useStore } from '../store/useStore.js'
 
 const props = defineProps({
   visible: Boolean,
@@ -63,7 +64,15 @@ const props = defineProps({
 
 defineEmits(['close', 'show-qr', 'borrow-item', 'return-item', 'delete-item', 'add-remote', 'print-all-qr'])
 
+const { loadItemsForMaterial } = useStore()
+
 const searchQuery = ref('')
+
+watch(() => props.visible, async (v) => {
+  if (v && props.material?.has_individual_tracking) {
+    await loadItemsForMaterial(props.material.id)
+  }
+})
 
 const items = computed(() => props.material?.items || [])
 

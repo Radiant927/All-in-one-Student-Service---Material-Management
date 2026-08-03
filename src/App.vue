@@ -8,7 +8,11 @@
   <ToastContainer ref="toastRef" />
 
   <div id="app">
-    <AppHeader @toggle-admin="showAdminPanel = true" />
+    <AppHeader
+        @toggle-admin="showAdminPanel = true"
+        @toggle-archive="showArchiveForm = true"
+        @toggle-import="showImportModal = true"
+      />
 
     <StatsRow
       :total-types="totalTypes"
@@ -61,7 +65,7 @@
     </div>
 
     <HistorySection :history="recentHistory" />
-    <footer class="footer">© 2026 一站式物资管理系统 · 数据为虚拟数据</footer>
+    <footer class="footer">© 2026 一站式物资管理系统 · 数据已持久化存储</footer>
   </div>
 
   <BorrowModal
@@ -131,11 +135,31 @@
     @logout="handleAdminLogout"
     @save-total="handleSaveTotal"
     @save-threshold="handleSaveThreshold"
+    @toggle-locations="showLocationManager = true"
+    @toggle-import="showImportModal = true"
+  />
+
+  <MaterialArchiveForm
+    :visible="showArchiveForm"
+    :material="editingMaterial"
+    @close="showArchiveForm = false; editingMaterial = null"
+    @submit="handleArchiveSubmit"
+  />
+
+  <ImportExcelModal
+    :visible="showImportModal"
+    @close="showImportModal = false"
+    @imported="handleImported"
+  />
+
+  <LocationManager
+    :visible="showLocationManager"
+    @close="showLocationManager = false"
   />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useStore } from './store/useStore.js'
 import AppHeader from './components/AppHeader.vue'
 import StatsRow from './components/StatsRow.vue'
@@ -149,6 +173,9 @@ import AddRemoteModal from './components/AddRemoteModal.vue'
 import ItemBorrowModal from './components/ItemBorrowModal.vue'
 import ItemReturnModal from './components/ItemReturnModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
+import MaterialArchiveForm from './components/MaterialArchiveForm.vue'
+import ImportExcelModal from './components/ImportExcelModal.vue'
+import LocationManager from './components/LocationManager.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import QRCode from 'qrcode'
 
@@ -158,11 +185,20 @@ const {
   getRemaining, getMaterial, getAvailableItems, getBorrowedItems,
   borrowItem, borrowIndividualItem, returnItem, returnIndividualItem,
   updateTotalQuantity, updateThreshold, addRemoteItems, removeRemoteItem,
-  verifyPassword
+  verifyPassword, loadAll, loadItemsForMaterial, createMaterial, updateMaterial
 } = useStore()
 
 const toastRef = ref(null)
 function toast(msg, type = 'info') { toastRef.value?.show(msg, type) }
+
+const remoteMaterial = computed(() =>
+  durableMaterials.value.find(m => m.has_individual_tracking)
+)
+const remoteMaterialId = computed(() => remoteMaterial.value?.id)
+
+onMounted(() => {
+  loadAll()
+})
 
 // Borrow modal
 const borrowModalVisible = ref(false)
@@ -245,7 +281,7 @@ function openQRModal(itemCode) {
 
 function printQR(itemCode) {
   const canvas = document.createElement('canvas')
-  QRCode.toCanvas(canvas, `MATERIAL:ac-remote:${itemCode}`, {
+  QRCode.toCanvas(canvas, `MATERIAL:${remoteMaterialId.value}:${itemCode}`, {
     width: 250,
     color: { dark: '#1a2332', light: '#ffffff' }
   }).then(() => {
@@ -258,7 +294,7 @@ function printQR(itemCode) {
 }
 
 function printAllQR() {
-  const m = getMaterial('ac-remote')
+  const m = remoteMaterial.value
   if (!m?.items) return
   const w = window.open('', '_blank', 'width=900,height=700')
   w.document.write(`<!DOCTYPE html><html><head><title>打印全部二维码</title><style>body{font-family:sans-serif;padding:20px;}h2{text-align:center;}.subtitle{text-align:center;color:#666;font-size:14px;margin-bottom:20px;}.qr-grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;}.qr-item{text-align:center;width:180px;padding:12px;border:1px dashed #ddd;border-radius:8px;}.qr-item .code{font-weight:bold;margin-bottom:6px;}@media print{.qr-item{page-break-inside:avoid;}}</style></head><body><h2>${m.icon} ${m.name} - 二维码清单</h2><p class="subtitle">共 ${m.items.length} 个遥控器</p><div class="qr-grid" id="printQrGrid"></div></body></html>`)
@@ -271,7 +307,7 @@ function printAllQR() {
       div.innerHTML = `<div class="code">🔑 ${i.code}</div>`
       grid.appendChild(div)
       const cv = w.document.createElement('canvas')
-      QRCode.toCanvas(cv, `MATERIAL:ac-remote:${i.code}`, { width: 130, color: { dark: '#1a2332', light: '#ffffff' } }).then(() => div.appendChild(cv))
+      QRCode.toCanvas(cv, `MATERIAL:${remoteMaterialId.value}:${i.code}`, { width: 130, color: { dark: '#1a2332', light: '#ffffff' } }).then(() => div.appendChild(cv))
     })
     setTimeout(() => w.print(), 800)
   }, 300)
@@ -280,7 +316,7 @@ function printAllQR() {
 // Add remote
 const showAddRemoteModal = ref(false)
 const nextRemoteNum = computed(() => {
-  const m = getMaterial('ac-remote')
+  const m = remoteMaterial.value
   if (!m?.items) return 1
   return m.items.reduce((max, i) => {
     const match = i.code.match(/\d+$/)
@@ -291,7 +327,8 @@ const nextRemoteNum = computed(() => {
 function handleAddRemotes({ prefix, startNum, count }) {
   if (isNaN(startNum) || startNum < 1) { toast('请输入有效的起始编号', 'error'); return }
   if (isNaN(count) || count < 1 || count > 50) { toast('添加数量需在 1~50 之间', 'error'); return }
-  const result = addRemoteItems('ac-remote', prefix, startNum, count)
+  if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
+  const result = addRemoteItems(remoteMaterialId.value, prefix, startNum, count)
   toast(result.msg, result.ok ? 'success' : 'error')
   if (result.ok) showAddRemoteModal.value = false
 }
@@ -306,7 +343,8 @@ function openItemBorrowModal(itemCode) {
 }
 
 function handleItemBorrow({ itemCode, borrower }) {
-  const result = borrowIndividualItem('ac-remote', itemCode, borrower)
+  if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
+  const result = borrowIndividualItem(remoteMaterialId.value, itemCode, borrower)
   toast(result.msg, result.ok ? 'success' : 'error')
   if (result.ok) itemBorrowModalVisible.value = false
 }
@@ -317,7 +355,7 @@ const itemReturnCode = ref('')
 const itemReturnCurrentBorrower = ref('')
 
 function openItemReturnModal(itemCode) {
-  const m = getMaterial('ac-remote')
+  const m = remoteMaterial.value
   const item = m?.items?.find(i => i.code === itemCode)
   if (!item) { toast(`遥控器 ${itemCode} 未被借出`, 'error'); return }
   itemReturnCode.value = itemCode
@@ -326,7 +364,8 @@ function openItemReturnModal(itemCode) {
 }
 
 function handleItemReturn({ itemCode, returner }) {
-  const result = returnIndividualItem('ac-remote', itemCode, returner)
+  if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
+  const result = returnIndividualItem(remoteMaterialId.value, itemCode, returner)
   toast(result.msg, result.ok ? 'success' : 'error')
   if (result.ok) itemReturnModalVisible.value = false
 }
@@ -334,7 +373,8 @@ function handleItemReturn({ itemCode, returner }) {
 // Delete item
 function handleDeleteItem(itemCode) {
   if (!confirm(`确定要删除遥控器 ${itemCode} 吗？此操作不可恢复。`)) return
-  const result = removeRemoteItem('ac-remote', itemCode)
+  if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
+  const result = removeRemoteItem(remoteMaterialId.value, itemCode)
   toast(result.msg, result.ok ? 'success' : 'error')
 }
 
@@ -362,6 +402,35 @@ function handleSaveThreshold(materialId, newThreshold) {
   const result = updateThreshold(materialId, newThreshold)
   toast(result.msg, result.ok ? 'success' : 'error')
 }
+
+// Archive form
+const showArchiveForm = ref(false)
+const editingMaterial = ref(null)
+
+async function handleArchiveSubmit(formData) {
+  let result
+  if (editingMaterial.value) {
+    result = await updateMaterial(editingMaterial.value.id, formData)
+  } else {
+    result = await createMaterial(formData)
+  }
+  toast(result.msg, result.ok ? 'success' : 'error')
+  if (result.ok) {
+    showArchiveForm.value = false
+    editingMaterial.value = null
+  }
+}
+
+// Import modal
+const showImportModal = ref(false)
+
+function handleImported() {
+  loadAll()
+  toast('导入成功，数据已刷新', 'success')
+}
+
+// Location manager
+const showLocationManager = ref(false)
 
 // ESC to close modals
 document.addEventListener('keydown', (e) => {

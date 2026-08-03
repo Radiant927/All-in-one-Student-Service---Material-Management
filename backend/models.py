@@ -1,0 +1,110 @@
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship
+from database import Base
+
+
+class Warehouse(Base):
+    __tablename__ = "warehouses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True)
+    location_desc = Column(String(200), default="")
+
+    locations = relationship("StorageLocation", back_populates="warehouse", cascade="all, delete-orphan")
+    inventory_items = relationship("InventoryItem", back_populates="warehouse")
+    inventory_batches = relationship("InventoryBatch", back_populates="warehouse")
+
+
+class StorageLocation(Base):
+    __tablename__ = "storage_locations"
+    __table_args__ = (UniqueConstraint("warehouse_id", "full_code"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    shelf = Column(String(20), nullable=False)
+    level = Column(Integer, nullable=False)
+    position = Column(String(20), default="")
+    full_code = Column(String(60), nullable=False)
+
+    warehouse = relationship("Warehouse", back_populates="locations")
+    inventory_items = relationship("InventoryItem", back_populates="location")
+    inventory_batches = relationship("InventoryBatch", back_populates="location")
+
+
+class Material(Base):
+    __tablename__ = "materials"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    spec = Column(String(200), default="")
+    unit = Column(String(20), nullable=False, default="个")
+    category = Column(String(20), nullable=False, default="consumable")  # durable / consumable
+    sub_category = Column(String(30), nullable=False, default="direct_consumption")  # new_consumable / recyclable / direct_consumption
+    has_individual_tracking = Column(Integer, nullable=False, default=0)
+    low_stock_threshold = Column(Integer, nullable=False, default=5)
+    icon = Column(String(10), default="📦")
+    color_idx = Column(Integer, default=0)
+    created_at = Column(String(30), nullable=False)
+    updated_at = Column(String(30), nullable=False)
+
+    inventory_items = relationship("InventoryItem", back_populates="material", cascade="all, delete-orphan")
+    inventory_batches = relationship("InventoryBatch", back_populates="material", cascade="all, delete-orphan")
+    borrow_history = relationship("BorrowHistory", back_populates="material", cascade="all, delete-orphan")
+
+
+class InventoryItem(Base):
+    __tablename__ = "inventory_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False)
+    code = Column(String(100), nullable=False, unique=True)
+    status = Column(String(20), nullable=False, default="available")  # available / borrowed
+    borrowed_by = Column(String(100), nullable=True)
+    borrow_time = Column(String(30), nullable=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    location_id = Column(Integer, ForeignKey("storage_locations.id"), nullable=True)
+    created_at = Column(String(30), nullable=False)
+
+    material = relationship("Material", back_populates="inventory_items")
+    warehouse = relationship("Warehouse", back_populates="inventory_items")
+    location = relationship("StorageLocation", back_populates="inventory_items")
+
+
+class InventoryBatch(Base):
+    __tablename__ = "inventory_batches"
+    __table_args__ = (UniqueConstraint("material_id", "warehouse_id", "location_id"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    location_id = Column(Integer, ForeignKey("storage_locations.id"), nullable=True)
+    quantity = Column(Integer, nullable=False, default=0)
+    created_at = Column(String(30), nullable=False)
+    updated_at = Column(String(30), nullable=False)
+
+    material = relationship("Material", back_populates="inventory_batches")
+    warehouse = relationship("Warehouse", back_populates="inventory_batches")
+    location = relationship("StorageLocation", back_populates="inventory_batches")
+
+
+class BorrowHistory(Base):
+    __tablename__ = "borrow_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False)
+    action = Column(String(20), nullable=False)  # borrow / return
+    quantity = Column(Integer, nullable=False, default=1)
+    borrower = Column(String(100), nullable=True)
+    returned_by = Column(String(100), nullable=True)
+    item_code = Column(String(100), nullable=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
+    created_at = Column(String(30), nullable=False)
+
+    material = relationship("Material", back_populates="borrow_history")
+
+
+class AdminSetting(Base):
+    __tablename__ = "admin_settings"
+
+    key = Column(String(50), primary_key=True)
+    value = Column(String(500), nullable=False)

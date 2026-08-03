@@ -23,6 +23,7 @@
             <option v-for="n in remaining" :key="n" :value="n">{{ n }} 个</option>
           </select>
         </div>
+        <WarehouseSelector v-model="warehouseSelection" />
         <button class="btn-primary" @click="confirm">确认借出</button>
       </div>
     </div>
@@ -31,6 +32,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import WarehouseSelector from './WarehouseSelector.vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -45,12 +47,14 @@ const borrower = ref('')
 const itemCode = ref('')
 const quantity = ref(1)
 const inputRef = ref(null)
+const warehouseSelection = ref({ warehouse_id: null, location_id: null })
 
 watch(() => props.visible, (v) => {
   if (v) {
     borrower.value = ''
     itemCode.value = ''
     quantity.value = 1
+    warehouseSelection.value = { warehouse_id: null, location_id: null }
     setTimeout(() => inputRef.value?.focus(), 200)
   }
 })
@@ -60,7 +64,8 @@ function confirm() {
     materialId: props.material?.id,
     borrower: borrower.value,
     itemCode: itemCode.value,
-    quantity: quantity.value
+    quantity: quantity.value,
+    warehouseId: warehouseSelection.value.warehouse_id,
   })
 }
 </script>
