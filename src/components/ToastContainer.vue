@@ -14,21 +14,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { useToastState, toast } from '../utils/toast.js'
 
-const toasts = ref([])
-let idCounter = 0
-const iconMap = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' }
+const { toasts, iconMap } = useToastState()
 
-function show(message, type = 'info') {
-  const id = ++idCounter
-  toasts.value.push({ id, message, type })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter(t => t.id !== id)
-  }, 2600)
-}
-
-defineExpose({ show })
+defineExpose({ show: toast })
 </script>
 
 <style scoped>

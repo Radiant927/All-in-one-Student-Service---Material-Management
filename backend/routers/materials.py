@@ -27,7 +27,7 @@ def list_materials(
 
     result = []
     for m in materials:
-        d = m.__dict__.copy()
+        d = {k: v for k, v in m.__dict__.items() if not k.startswith('_')}
         summary = get_material_inventory_summary(db, m.id)
         d["total_quantity"] = summary["total_quantity"]
         d["borrowed_quantity"] = summary["borrowed_quantity"]

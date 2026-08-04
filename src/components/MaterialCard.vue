@@ -34,7 +34,7 @@
         {{ borrowed === 0 ? '无需归还' : '📥 归还' }}
       </button>
       <button
-        v-if="material.hasIndividualTracking"
+        v-if="material.has_individual_tracking"
         class="btn btn-manage"
         @click="$emit('manage', material.id)"
       >📋 管理</button>

@@ -10,7 +10,7 @@
           <label class="form-label">借用人姓名</label>
           <input class="form-input" v-model="borrower" placeholder="请输入借用人姓名" @keydown.enter="confirm" ref="inputRef">
         </div>
-        <div v-if="material?.hasIndividualTracking" class="form-group">
+        <div v-if="material?.has_individual_tracking" class="form-group">
           <label class="form-label">遥控器代号</label>
           <select class="form-select" v-model="itemCode">
             <option v-if="availableItems.length === 0" value="">无可用遥控器</option>

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -35,10 +35,10 @@ class Material(Base):
     __tablename__ = "materials"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(200), nullable=False)
+    name = Column(String(200), nullable=False, unique=True)
     spec = Column(String(200), default="")
     unit = Column(String(20), nullable=False, default="个")
-    category = Column(String(20), nullable=False, default="consumable")  # durable / consumable
+    category = Column(String(20), nullable=False, default="consumable", index=True)  # durable / consumable
     sub_category = Column(String(30), nullable=False, default="direct_consumption")  # new_consumable / recyclable / direct_consumption
     has_individual_tracking = Column(Integer, nullable=False, default=0)
     low_stock_threshold = Column(Integer, nullable=False, default=5)
@@ -56,12 +56,12 @@ class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
     code = Column(String(100), nullable=False, unique=True)
-    status = Column(String(20), nullable=False, default="available")  # available / borrowed
+    status = Column(String(20), nullable=False, default="available", index=True)  # available / borrowed
     borrowed_by = Column(String(100), nullable=True)
     borrow_time = Column(String(30), nullable=True)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
     location_id = Column(Integer, ForeignKey("storage_locations.id"), nullable=True)
     created_at = Column(String(30), nullable=False)
 
@@ -75,8 +75,8 @@ class InventoryBatch(Base):
     __table_args__ = (UniqueConstraint("material_id", "warehouse_id", "location_id"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
     location_id = Column(Integer, ForeignKey("storage_locations.id"), nullable=True)
     quantity = Column(Integer, nullable=False, default=0)
     created_at = Column(String(30), nullable=False)
@@ -91,14 +91,14 @@ class BorrowHistory(Base):
     __tablename__ = "borrow_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False)
-    action = Column(String(20), nullable=False)  # borrow / return
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
+    action = Column(String(20), nullable=False, index=True)  # borrow / return / transfer / inbound
     quantity = Column(Integer, nullable=False, default=1)
     borrower = Column(String(100), nullable=True)
     returned_by = Column(String(100), nullable=True)
     item_code = Column(String(100), nullable=True)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
-    created_at = Column(String(30), nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True, index=True)
+    created_at = Column(String(30), nullable=False, index=True)
 
     material = relationship("Material", back_populates="borrow_history")
 

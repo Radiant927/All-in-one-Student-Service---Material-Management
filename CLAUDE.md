@@ -53,7 +53,8 @@ print(r.json())
 - **Engine**: SQLAlchemy 2.0 ORM with `declarative_base()`, sessions via `get_db()` dependency
 - **Seeding**: `backend/seed.py` runs on startup, idempotent (skips if data exists). Admin password defaults to `admin888` but can be overridden via `ADMIN_PASSWORD` env var.
 - **Lifespan**: `main.py` creates tables then seeds on startup via `@asynccontextmanager`
-- **CORS**: Fully open (`allow_origins=["*"]`)
+- **CORS**: Fully open origins (`allow_origins=["*"]`), `allow_credentials=False`
+- **Security**: Admin password stored as SHA-256 + random salt hash (`hash:salt` format). `GET /api/admin/settings` filters out `password` and `smtp_pass`. Excel upload capped at 10 MB. Backward compatible with plaintext passwords from older databases.
 
 ### API Response Convention
 
@@ -66,6 +67,14 @@ User click → App.vue handler → store action → api/*.js → FastAPI endpoin
                                                      ← JSON response ←
 App.vue handler → store.loadAll() → DOM updates via reactive bindings
 ```
+
+### Field Name Conventions
+
+**Backend → Frontend**: API returns `snake_case` (e.g., `has_individual_tracking`, `material_id`, `created_at`). The store in `loadMaterials()` maps a few fields to camelCase aliases: `totalQuantity` ← `total_quantity`, `borrowedQuantity` ← `borrowed_quantity`. All other fields are accessed in their original snake_case form in templates and components. Always check the actual API response before using a field in a component — snake_case is the default.
+
+### Global Toast
+
+`src/utils/toast.js` provides a singleton `toast(msg, type)` function. Import in any component via `import { toast } from '../utils/toast.js'`. Types: `'success'`, `'error'`, `'info'`, `'warning'`. Never use bare `alert()` for error feedback.
 
 ### Two Inventory Models
 
@@ -94,9 +103,10 @@ Two physical warehouses created by seed: "主仓库" (main) and "回收仓" (rec
 |---|---|
 | `src/App.vue` | Root component — all modals, view switching logic, event orchestration |
 | `src/store/useStore.js` | All state, getters, loaders, actions |
+| `src/utils/toast.js` | Global toast notification singleton — `toast(msg, type)` |
 | `src/api/client.js` | HTTP client — `apiGet/apiPost/apiPut/apiDelete/apiUpload` |
 | `backend/main.py` | App factory, lifespan, router registration |
-| `backend/models.py` | 7 SQLAlchemy ORM models (Warehouse, StorageLocation, Material, InventoryItem, InventoryBatch, BorrowHistory, AdminSetting) |
+| `backend/models.py` | 7 SQLAlchemy ORM models with indexes on FK/status/date columns, unique constraint on Material.name |
 | `backend/schemas.py` | All Pydantic request/response schemas |
 | `backend/services/inventory_service.py` | Borrow/return/transfer business logic with priority rules |
 | `backend/services/import_service.py` | Excel import via openpyxl |
@@ -107,8 +117,8 @@ Two physical warehouses created by seed: "主仓库" (main) and "回收仓" (rec
 ### Seed Data on Startup
 
 - **2 warehouses**: 主仓库 (一楼库房), 回收仓 (书画室旁)
-- **4 materials**: 空调遥控器 (durable/recyclable, 20 tracked items), 饮用水 (direct_consumption), 纸巾 (direct_consumption), 笔 (recyclable)
-- **Admin password**: `admin888`
+- **4 materials**: 空调遥控器 (durable/recyclable, 20 tracked items), 饮用水 (direct_consumption, 50桶/已借12), 纸巾 (direct_consumption, 100包/已借30), 笔 (recyclable, 60支/已借18, 其中回收仓5支)
+- **Admin password**: `admin888` (stored as SHA-256 hash, plaintext `admin888` in old databases auto-upgraded on first login)
 
 ### Reset Database
 

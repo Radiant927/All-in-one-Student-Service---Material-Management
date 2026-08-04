@@ -1,6 +1,7 @@
 from datetime import datetime
 from database import SessionLocal
 from models import Warehouse, StorageLocation, Material, InventoryItem, InventoryBatch, BorrowHistory, AdminSetting
+from routers.admin import hash_password
 import os
 
 
@@ -70,28 +71,34 @@ def seed():
             loc_a21 = loc_map.get("A-2-1")
 
             if water and loc_a12:
+                # 初始总量50桶，已借出12桶，现余38桶
                 db.add(InventoryBatch(material_id=water.id, warehouse_id=w1.id, location_id=loc_a12.id,
-                                      quantity=38, created_at=now, updated_at=now))
-                # Record 12 borrowed
+                                      quantity=50, created_at=now, updated_at=now))
                 db.add(BorrowHistory(material_id=water.id, action="borrow", quantity=12,
                                      borrower="系统初始化", warehouse_id=w1.id, created_at=now))
 
             if tissues and loc_a21:
+                # 初始总量100包，已借出30包，现余70包
                 db.add(InventoryBatch(material_id=tissues.id, warehouse_id=w1.id, location_id=loc_a21.id,
-                                      quantity=70, created_at=now, updated_at=now))
+                                      quantity=100, created_at=now, updated_at=now))
                 db.add(BorrowHistory(material_id=tissues.id, action="borrow", quantity=30,
                                      borrower="系统初始化", warehouse_id=w1.id, created_at=now))
 
             if pens and loc_a21:
+                # 初始总量60支，已借出18支（其中5支从回收仓借出），现余42支；回收仓余5支
                 db.add(InventoryBatch(material_id=pens.id, warehouse_id=w1.id, location_id=loc_a21.id,
-                                      quantity=42, created_at=now, updated_at=now))
-                db.add(BorrowHistory(material_id=pens.id, action="borrow", quantity=18,
+                                      quantity=55, created_at=now, updated_at=now))
+                db.add(InventoryBatch(material_id=pens.id, warehouse_id=w2.id, location_id=loc_a21.id,
+                                      quantity=5, created_at=now, updated_at=now))
+                db.add(BorrowHistory(material_id=pens.id, action="borrow", quantity=13,
                                      borrower="系统初始化", warehouse_id=w1.id, created_at=now))
+                db.add(BorrowHistory(material_id=pens.id, action="borrow", quantity=5,
+                                     borrower="系统初始化", warehouse_id=w2.id, created_at=now))
 
-        # Admin settings
+        # Admin settings - 密码使用 SHA-256 + salt 哈希存储
         if db.query(AdminSetting).count() == 0:
             admin_password = os.getenv("ADMIN_PASSWORD", "admin888")
-            db.add(AdminSetting(key="password", value=admin_password))
+            db.add(AdminSetting(key="password", value=hash_password(admin_password)))
 
         db.commit()
         print("Seed data inserted successfully.")

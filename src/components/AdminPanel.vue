@@ -172,11 +172,16 @@ watch(() => props.visible, (v) => {
     props.materials.forEach(m => {
       editValues[m.id] = {
         total: m.totalQuantity || 0,
-        threshold: m.lowStockThreshold || 0
+        threshold: m.low_stock_threshold || 0
       }
     })
     if (props.loggedIn) loadSmtpSettings()
   }
+})
+
+// 登录成功后加载 SMTP 设置（面板已打开时）
+watch(() => props.loggedIn, (val) => {
+  if (val && props.visible) loadSmtpSettings()
 })
 
 async function login() {

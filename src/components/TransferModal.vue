@@ -68,6 +68,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { toast } from '../utils/toast.js'
 import { fetchWarehouses, fetchWarehouseDetail } from '../api/warehouses.js'
 import { transfer } from '../api/transfer.js'
 
@@ -169,7 +170,7 @@ async function submit() {
   if (res.ok) {
     emit('done', res)
   } else {
-    alert(res.msg)
+    toast(res.msg, 'error')
   }
 }
 </script>

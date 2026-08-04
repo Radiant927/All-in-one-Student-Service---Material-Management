@@ -264,26 +264,26 @@ const borrowMaterial = ref(null)
 const borrowRemaining = ref(0)
 const borrowAvailableItems = ref([])
 
-function openBorrowModal(materialId) {
+async function openBorrowModal(materialId) {
   const m = getMaterial(materialId)
   if (!m) return
   borrowMaterial.value = m
   borrowRemaining.value = getRemaining(m)
-  borrowAvailableItems.value = getAvailableItems(materialId)
+  borrowAvailableItems.value = await getAvailableItems(materialId)
   borrowModalVisible.value = true
 }
 
-function handleBorrow({ materialId, borrower, itemCode, quantity }) {
+async function handleBorrow({ materialId, borrower, itemCode, quantity }) {
   const m = getMaterial(materialId)
   if (!m) return
-  if (m.hasIndividualTracking) {
+  if (m.has_individual_tracking) {
     if (!itemCode) { toast('没有可用的遥控器', 'error'); return }
-    const result = borrowIndividualItem(materialId, itemCode, borrower)
+    const result = await borrowIndividualItem(materialId, itemCode, borrower)
     toast(result.msg, result.ok ? 'success' : 'error')
     if (result.ok) borrowModalVisible.value = false
   } else {
     if (!borrower?.trim()) { toast('请输入借用人姓名', 'error'); return }
-    const result = borrowItem(materialId, quantity, borrower.trim())
+    const result = await borrowItem(materialId, quantity, borrower.trim())
     toast(result.msg, result.ok ? 'success' : 'error')
     if (result.ok) borrowModalVisible.value = false
   }
@@ -294,24 +294,24 @@ const returnModalVisible = ref(false)
 const returnMaterial = ref(null)
 const returnBorrowedItems = ref([])
 
-function openReturnModal(materialId) {
+async function openReturnModal(materialId) {
   const m = getMaterial(materialId)
   if (!m) return
   returnMaterial.value = m
-  returnBorrowedItems.value = getBorrowedItems(materialId)
+  returnBorrowedItems.value = await getBorrowedItems(materialId)
   returnModalVisible.value = true
 }
 
-function handleReturn({ materialId, returner, itemCode, quantity }) {
+async function handleReturn({ materialId, returner, itemCode, quantity }) {
   const m = getMaterial(materialId)
   if (!m) return
-  if (m.hasIndividualTracking) {
+  if (m.has_individual_tracking) {
     if (!itemCode) { toast('没有已借出的遥控器', 'error'); return }
-    const result = returnIndividualItem(materialId, itemCode, returner)
+    const result = await returnIndividualItem(materialId, itemCode, returner)
     toast(result.msg, result.ok ? 'success' : 'error')
     if (result.ok) returnModalVisible.value = false
   } else {
-    const result = returnItem(materialId, quantity, returner)
+    const result = await returnItem(materialId, quantity, returner)
     toast(result.msg, result.ok ? 'success' : 'error')
     if (result.ok) returnModalVisible.value = false
   }
@@ -337,7 +337,13 @@ function openQRModal(itemCode) {
   qrModalVisible.value = true
 }
 
+function escHtml(s) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+  return String(s).replace(/[&<>"']/g, c => map[c])
+}
+
 function printQR(itemCode) {
+  const safeCode = escHtml(itemCode)
   const canvas = document.createElement('canvas')
   QRCode.toCanvas(canvas, `MATERIAL:${remoteMaterialId.value}:${itemCode}`, {
     width: 250,
@@ -345,7 +351,7 @@ function printQR(itemCode) {
   }).then(() => {
     const dataUrl = canvas.toDataURL('image/png')
     const w = window.open('', '_blank', 'width=400,height=500')
-    w.document.write(`<!DOCTYPE html><html><head><title>打印二维码 - ${itemCode}</title><style>body{text-align:center;padding:30px;font-family:sans-serif;}img{border:2px dashed #ddd;padding:10px;}</style></head><body><h2>🔑 ${itemCode}</h2><p>空调遥控器 - 专属二维码</p><img src="${dataUrl}" width="250" height="250"><p style="margin-top:16px;font-size:13px;color:#888;">扫描二维码进行借出登记</p></body></html>`)
+    w.document.write(`<!DOCTYPE html><html><head><title>打印二维码 - ${safeCode}</title><style>body{text-align:center;padding:30px;font-family:sans-serif;}img{border:2px dashed #ddd;padding:10px;}</style></head><body><h2>🔑 ${safeCode}</h2><p>空调遥控器 - 专属二维码</p><img src="${dataUrl}" width="250" height="250"><p style="margin-top:16px;font-size:13px;color:#888;">扫描二维码进行借出登记</p></body></html>`)
     w.document.close()
     setTimeout(() => w.print(), 400)
   })
@@ -354,15 +360,18 @@ function printQR(itemCode) {
 function printAllQR() {
   const m = remoteMaterial.value
   if (!m?.items) return
+  const safeName = escHtml(m.name)
+  const safeIcon = escHtml(m.icon)
   const w = window.open('', '_blank', 'width=900,height=700')
-  w.document.write(`<!DOCTYPE html><html><head><title>打印全部二维码</title><style>body{font-family:sans-serif;padding:20px;}h2{text-align:center;}.subtitle{text-align:center;color:#666;font-size:14px;margin-bottom:20px;}.qr-grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;}.qr-item{text-align:center;width:180px;padding:12px;border:1px dashed #ddd;border-radius:8px;}.qr-item .code{font-weight:bold;margin-bottom:6px;}@media print{.qr-item{page-break-inside:avoid;}}</style></head><body><h2>${m.icon} ${m.name} - 二维码清单</h2><p class="subtitle">共 ${m.items.length} 个遥控器</p><div class="qr-grid" id="printQrGrid"></div></body></html>`)
+  w.document.write(`<!DOCTYPE html><html><head><title>打印全部二维码</title><style>body{font-family:sans-serif;padding:20px;}h2{text-align:center;}.subtitle{text-align:center;color:#666;font-size:14px;margin-bottom:20px;}.qr-grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;}.qr-item{text-align:center;width:180px;padding:12px;border:1px dashed #ddd;border-radius:8px;}.qr-item .code{font-weight:bold;margin-bottom:6px;}@media print{.qr-item{page-break-inside:avoid;}}</style></head><body><h2>${safeIcon} ${safeName} - 二维码清单</h2><p class="subtitle">共 ${m.items.length} 个遥控器</p><div class="qr-grid" id="printQrGrid"></div></body></html>`)
   w.document.close()
   setTimeout(() => {
     const grid = w.document.getElementById('printQrGrid')
     m.items.forEach(i => {
       const div = w.document.createElement('div')
       div.className = 'qr-item'
-      div.innerHTML = `<div class="code">🔑 ${i.code}</div>`
+      const safeCode = escHtml(i.code)
+      div.innerHTML = `<div class="code">🔑 ${safeCode}</div>`
       grid.appendChild(div)
       const cv = w.document.createElement('canvas')
       QRCode.toCanvas(cv, `MATERIAL:${remoteMaterialId.value}:${i.code}`, { width: 130, color: { dark: '#1a2332', light: '#ffffff' } }).then(() => div.appendChild(cv))
@@ -382,11 +391,11 @@ const nextRemoteNum = computed(() => {
   }, 0) + 1
 })
 
-function handleAddRemotes({ prefix, startNum, count }) {
+async function handleAddRemotes({ prefix, startNum, count }) {
   if (isNaN(startNum) || startNum < 1) { toast('请输入有效的起始编号', 'error'); return }
   if (isNaN(count) || count < 1 || count > 50) { toast('添加数量需在 1~50 之间', 'error'); return }
   if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
-  const result = addRemoteItems(remoteMaterialId.value, prefix, startNum, count)
+  const result = await addRemoteItems(remoteMaterialId.value, prefix, startNum, count)
   toast(result.msg, result.ok ? 'success' : 'error')
   if (result.ok) showAddRemoteModal.value = false
 }
@@ -400,9 +409,9 @@ function openItemBorrowModal(itemCode) {
   itemBorrowModalVisible.value = true
 }
 
-function handleItemBorrow({ itemCode, borrower }) {
+async function handleItemBorrow({ itemCode, borrower }) {
   if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
-  const result = borrowIndividualItem(remoteMaterialId.value, itemCode, borrower)
+  const result = await borrowIndividualItem(remoteMaterialId.value, itemCode, borrower)
   toast(result.msg, result.ok ? 'success' : 'error')
   if (result.ok) itemBorrowModalVisible.value = false
 }
@@ -417,22 +426,22 @@ function openItemReturnModal(itemCode) {
   const item = m?.items?.find(i => i.code === itemCode)
   if (!item) { toast(`遥控器 ${itemCode} 未被借出`, 'error'); return }
   itemReturnCode.value = itemCode
-  itemReturnCurrentBorrower.value = item.borrowedBy || '未知'
+  itemReturnCurrentBorrower.value = item.borrowed_by || '未知'
   itemReturnModalVisible.value = true
 }
 
-function handleItemReturn({ itemCode, returner }) {
+async function handleItemReturn({ itemCode, returner }) {
   if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
-  const result = returnIndividualItem(remoteMaterialId.value, itemCode, returner)
+  const result = await returnIndividualItem(remoteMaterialId.value, itemCode, returner)
   toast(result.msg, result.ok ? 'success' : 'error')
   if (result.ok) itemReturnModalVisible.value = false
 }
 
 // Delete item
-function handleDeleteItem(itemCode) {
+async function handleDeleteItem(itemCode) {
   if (!confirm(`确定要删除遥控器 ${itemCode} 吗？此操作不可恢复。`)) return
   if (!remoteMaterialId.value) { toast('未找到遥控器物资', 'error'); return }
-  const result = removeRemoteItem(remoteMaterialId.value, itemCode)
+  const result = await removeRemoteItem(remoteMaterialId.value, itemCode)
   toast(result.msg, result.ok ? 'success' : 'error')
 }
 
@@ -440,8 +449,9 @@ function handleDeleteItem(itemCode) {
 const showAdminPanel = ref(false)
 const adminLoggedIn = ref(false)
 
-function handleAdminLogin(password) {
-  if (verifyPassword(password)) {
+async function handleAdminLogin(password) {
+  const res = await verifyPassword(password)
+  if (res.ok) {
     adminLoggedIn.value = true
     toast('管理员验证成功', 'success')
   } else {
@@ -451,13 +461,13 @@ function handleAdminLogin(password) {
 
 function handleAdminLogout() { adminLoggedIn.value = false }
 
-function handleSaveTotal(materialId, newTotal) {
-  const result = updateTotalQuantity(materialId, newTotal)
+async function handleSaveTotal(materialId, newTotal) {
+  const result = await updateTotalQuantity(materialId, newTotal)
   toast(result.msg, result.ok ? 'success' : 'error')
 }
 
-function handleSaveThreshold(materialId, newThreshold) {
-  const result = updateThreshold(materialId, newThreshold)
+async function handleSaveThreshold(materialId, newThreshold) {
+  const result = await updateThreshold(materialId, newThreshold)
   toast(result.msg, result.ok ? 'success' : 'error')
 }
 

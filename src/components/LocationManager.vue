@@ -35,6 +35,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { toast } from '../utils/toast.js'
 import { fetchWarehouses, fetchAllLocations, createLocation, deleteLocation } from '../api/warehouses.js'
 
 const props = defineProps({ visible: Boolean })
@@ -77,7 +78,7 @@ async function addLocation() {
     newLocation.position = ''
     await loadData()
   } else {
-    alert(res.msg)
+    toast(res.msg, 'error')
   }
 }
 
@@ -87,7 +88,7 @@ async function removeLocation(id) {
   if (res.ok) {
     await loadData()
   } else {
-    alert(res.msg)
+    toast(res.msg, 'error')
   }
 }
 </script>
