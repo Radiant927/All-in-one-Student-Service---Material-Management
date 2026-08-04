@@ -68,6 +68,8 @@ User click → App.vue handler → store action → api/*.js → FastAPI endpoin
 App.vue handler → store.loadAll() → DOM updates via reactive bindings
 ```
 
+**Handler pattern**: All store actions are `async` and return `{ok, data, msg}`. Handlers MUST `await` the call and check `result.ok` for success/failure. A non-awaited Promise is always truthy (bypasses auth checks); accessing `.ok` on a non-object fails silently. Store actions should return the full response object, never just `res.ok`.
+
 ### Field Name Conventions
 
 **Backend → Frontend**: API returns `snake_case` (e.g., `has_individual_tracking`, `material_id`, `created_at`). The store in `loadMaterials()` maps a few fields to camelCase aliases: `totalQuantity` ← `total_quantity`, `borrowedQuantity` ← `borrowed_quantity`. All other fields are accessed in their original snake_case form in templates and components. Always check the actual API response before using a field in a component — snake_case is the default.
