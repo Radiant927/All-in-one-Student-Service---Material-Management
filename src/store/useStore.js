@@ -237,7 +237,7 @@ async function removeRemoteItemFn(materialId, itemCode) {
 
 async function verifyPasswordFn(password) {
   const res = await apiVerifyPassword(password)
-  return res.ok
+  return res
 }
 
 async function createMaterialFn(data) {
