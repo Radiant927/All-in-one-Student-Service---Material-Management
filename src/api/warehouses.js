@@ -31,3 +31,15 @@ export function updateLocation(id, data) {
 export function deleteLocation(id) {
   return apiDelete(`/locations/${id}`)
 }
+
+export function fetchWarehouseStats() {
+  return apiGet('/warehouses/stats')
+}
+
+export function fetchWarehouseDetail(id) {
+  return apiGet(`/warehouses/${id}/detail`)
+}
+
+export function fetchMaterialWarehouseBreakdown(materialId) {
+  return apiGet(`/materials/${materialId}/warehouse-breakdown`)
+}

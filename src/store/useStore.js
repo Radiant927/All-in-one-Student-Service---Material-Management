@@ -1,17 +1,23 @@
 import { reactive, computed } from 'vue'
 import { fetchMaterials, fetchMaterial, createMaterial, updateMaterial, deleteMaterial } from '../api/materials.js'
-import { fetchWarehouses, fetchAllLocations } from '../api/warehouses.js'
-import { fetchInventoryItems, addInventoryItems, deleteInventoryItem, updateInventoryBatch } from '../api/inventory.js'
+import { fetchWarehouses, fetchAllLocations, fetchWarehouseStats, fetchWarehouseDetail, fetchMaterialWarehouseBreakdown } from '../api/warehouses.js'
+import { fetchInventoryItems, addInventoryItems, deleteInventoryItem, updateInventoryBatch, inbound as apiInbound } from '../api/inventory.js'
 import { borrow as apiBorrow, returnItem as apiReturn, fetchHistory } from '../api/borrow.js'
 import { verifyPassword as apiVerifyPassword } from '../api/admin.js'
+import { transfer as apiTransfer } from '../api/transfer.js'
+import { fetchDashboardAlerts, fetchRestockSuggestions, sendReportEmail } from '../api/reports.js'
 
 const state = reactive({
   materials: [],
   warehouses: [],
   locations: [],
+  warehouseStats: [],
   borrowHistory: [],
   adminLoggedIn: false,
   loading: false,
+  currentView: 'all',
+  dashboardAlerts: null,
+  restockReport: null,
 })
 
 // --- Loaders ---
@@ -42,7 +48,35 @@ async function loadHistory() {
 }
 
 async function loadAll() {
-  await Promise.all([loadMaterials(), loadWarehouses(), loadHistory()])
+  await Promise.all([loadMaterials(), loadWarehouses(), loadHistory(), loadDashboardAlerts()])
+}
+
+async function loadDashboardAlerts() {
+  const res = await fetchDashboardAlerts(30)
+  if (res.ok) state.dashboardAlerts = res.data
+  return res
+}
+
+async function loadRestockReport(windowDays = 30) {
+  const res = await fetchRestockSuggestions(windowDays)
+  if (res.ok) state.restockReport = res.data
+  return res
+}
+
+async function loadWarehouseStats() {
+  const res = await fetchWarehouseStats()
+  if (res.ok) state.warehouseStats = res.data
+  return res
+}
+
+async function loadWarehouseDetail(id) {
+  const res = await fetchWarehouseDetail(id)
+  return res
+}
+
+async function loadMaterialWarehouseBreakdown(materialId) {
+  const res = await fetchMaterialWarehouseBreakdown(materialId)
+  return res.ok ? res.data : []
 }
 
 // --- Getters ---
@@ -72,6 +106,18 @@ const availableCount = computed(() =>
 
 const recentHistory = computed(() =>
   [...state.borrowHistory].reverse().slice(0, 20)
+)
+
+const alertCount = computed(() =>
+  (state.dashboardAlerts?.critical_count || 0) + (state.dashboardAlerts?.warning_count || 0)
+)
+
+const criticalAlerts = computed(() =>
+  state.dashboardAlerts?.top_alerts?.filter(a => a.status === 'critical') || []
+)
+
+const allAlerts = computed(() =>
+  state.dashboardAlerts?.top_alerts || []
 )
 
 // --- Helpers ---
@@ -212,6 +258,23 @@ async function deleteMaterialFn(id) {
   return res
 }
 
+async function transferFn(data) {
+  const res = await apiTransfer(data)
+  if (res.ok) await loadAll()
+  return res
+}
+
+async function inboundFn(data) {
+  const res = await apiInbound(data)
+  if (res.ok) await loadAll()
+  return res
+}
+
+async function sendReportEmailFn() {
+  const res = await sendReportEmail()
+  return res
+}
+
 export function useStore() {
   return {
     state,
@@ -232,6 +295,9 @@ export function useStore() {
     loadWarehouses,
     loadHistory,
     loadItemsForMaterial,
+    loadWarehouseStats,
+    loadWarehouseDetail,
+    loadMaterialWarehouseBreakdown,
     borrowItem: borrowItemFn,
     borrowIndividualItem: borrowIndividualItemFn,
     returnItem: returnItemFn,
@@ -244,5 +310,14 @@ export function useStore() {
     createMaterial: createMaterialFn,
     updateMaterial: updateMaterialFn,
     deleteMaterial: deleteMaterialFn,
+    transfer: transferFn,
+    inbound: inboundFn,
+    dashboardAlerts: computed(() => state.dashboardAlerts),
+    alertCount,
+    criticalAlerts,
+    allAlerts,
+    loadDashboardAlerts,
+    loadRestockReport,
+    sendReportEmail: sendReportEmailFn,
   }
 }

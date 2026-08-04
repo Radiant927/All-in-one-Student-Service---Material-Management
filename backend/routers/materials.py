@@ -120,3 +120,49 @@ def delete_material(material_id: int, db: Session = Depends(get_db)):
     db.delete(m)
     db.commit()
     return {"ok": True, "data": None, "msg": "物资已删除"}
+
+
+@router.get("/materials/{material_id}/warehouse-breakdown")
+def material_warehouse_breakdown(material_id: int, db: Session = Depends(get_db)):
+    from models import Material, InventoryBatch, InventoryItem, Warehouse, StorageLocation
+    from sqlalchemy import func
+
+    m = db.query(Material).filter(Material.id == material_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="物资不存在")
+
+    breakdown = []
+    warehouses = db.query(Warehouse).all()
+
+    for wh in warehouses:
+        qty = 0
+        location_code = ""
+
+        if m.has_individual_tracking:
+            qty = db.query(InventoryItem).filter(
+                InventoryItem.material_id == material_id,
+                InventoryItem.warehouse_id == wh.id
+            ).count()
+        else:
+            batches = db.query(InventoryBatch).filter(
+                InventoryBatch.material_id == material_id,
+                InventoryBatch.warehouse_id == wh.id,
+                InventoryBatch.quantity > 0
+            ).all()
+            qty = sum(b.quantity for b in batches)
+            if batches and batches[0].location_id:
+                loc = db.query(StorageLocation).filter(
+                    StorageLocation.id == batches[0].location_id
+                ).first()
+                if loc:
+                    location_code = loc.full_code
+
+        if qty > 0:
+            breakdown.append({
+                "warehouse_id": wh.id,
+                "warehouse_name": wh.name,
+                "quantity": qty,
+                "location_code": location_code,
+            })
+
+    return {"ok": True, "data": breakdown, "msg": ""}

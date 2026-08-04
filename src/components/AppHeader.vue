@@ -5,15 +5,21 @@
       <h1>一站式物资管理系统</h1>
     </div>
     <div class="header-actions">
+      <button class="btn-icon" @click="$emit('toggle-warehouse')" title="仓库视图">🏗️</button>
       <button class="btn-icon" @click="$emit('toggle-archive')" title="物资档案">📋</button>
       <button class="btn-icon" @click="$emit('toggle-import')" title="导入数据">📥</button>
+      <button class="btn-icon" @click="$emit('toggle-reports')" title="补货报表">
+        📊
+        <span v-if="alertBadge > 0" class="badge-dot">{{ alertBadge }}</span>
+      </button>
       <button class="btn-icon" @click="$emit('toggle-admin')" title="管理员设置">⚙️</button>
     </div>
   </header>
 </template>
 
 <script setup>
-defineEmits(['toggle-admin', 'toggle-archive', 'toggle-import'])
+defineEmits(['toggle-admin', 'toggle-archive', 'toggle-import', 'toggle-warehouse', 'toggle-reports'])
+defineProps({ alertBadge: { type: Number, default: 0 } })
 </script>
 
 <style scoped>
@@ -53,5 +59,13 @@ defineEmits(['toggle-admin', 'toggle-archive', 'toggle-import'])
   background: #fff; border-color: #667eea;
   color: #667eea; box-shadow: 0 4px 14px rgba(102,126,234,0.2);
   transform: translateY(-1px);
+}
+.btn-icon { position: relative; }
+.badge-dot {
+  position: absolute; top: -5px; right: -6px;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  background: #ef4444; color: #fff; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 5px; box-shadow: 0 2px 6px rgba(239,68,68,0.4);
 }
 </style>

@@ -113,13 +113,45 @@ def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
         if not borrower.strip():
             return {"ok": False, "msg": "请输入借用人姓名"}
 
-        # Deduct from batches, preferring the specified warehouse or recycling warehouse
-        batches = db.query(InventoryBatch).filter(
+        # Deduct from batches with recycling-priority logic
+        batches_query = db.query(InventoryBatch).filter(
             InventoryBatch.material_id == material_id,
             InventoryBatch.quantity > 0
-        ).order_by(InventoryBatch.id).all()
+        )
+
+        # Order batches by warehouse priority:
+        # - recyclable items: recycling warehouse first, then main warehouse
+        # - direct_consumption / new_consumable: main warehouse first
+        if m.sub_category == "recyclable":
+            # Find recycling warehouse
+            recycling_wh = db.query(Warehouse).filter(Warehouse.name == "回收仓").first()
+            if recycling_wh:
+                # Recycling warehouse batches first, then others
+                recycling_batches = batches_query.filter(
+                    InventoryBatch.warehouse_id == recycling_wh.id
+                ).order_by(InventoryBatch.id).all()
+                other_batches = batches_query.filter(
+                    InventoryBatch.warehouse_id != recycling_wh.id
+                ).order_by(InventoryBatch.id).all()
+                batches = recycling_batches + other_batches
+            else:
+                batches = batches_query.order_by(InventoryBatch.id).all()
+        else:
+            # Direct consumption or new consumable: prefer main warehouse
+            main_wh = db.query(Warehouse).filter(Warehouse.name == "主仓库").first()
+            if main_wh:
+                main_batches = batches_query.filter(
+                    InventoryBatch.warehouse_id == main_wh.id
+                ).order_by(InventoryBatch.id).all()
+                other_batches = batches_query.filter(
+                    InventoryBatch.warehouse_id != main_wh.id
+                ).order_by(InventoryBatch.id).all()
+                batches = main_batches + other_batches
+            else:
+                batches = batches_query.order_by(InventoryBatch.id).all()
 
         remaining = quantity
+        used_warehouse_id = None
         for batch in batches:
             if remaining <= 0:
                 break
@@ -127,9 +159,13 @@ def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
             batch.quantity -= deduct
             batch.updated_at = now
             remaining -= deduct
+            if used_warehouse_id is None:
+                used_warehouse_id = batch.warehouse_id
 
         db.add(BorrowHistory(material_id=material_id, action="borrow", quantity=quantity,
-                             borrower=borrower.strip(), warehouse_id=warehouse_id, created_at=now))
+                             borrower=borrower.strip(),
+                             warehouse_id=warehouse_id or used_warehouse_id,
+                             created_at=now))
         db.commit()
         return {"ok": True, "msg": f"成功借出 {quantity} 个{m.name}"}
 

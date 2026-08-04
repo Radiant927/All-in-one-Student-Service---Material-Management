@@ -14,17 +14,17 @@
           <span class="history-info">
             <template v-if="h.action === 'borrow'">
               {{ h.borrower || '未知' }} 借出
-              <span v-if="h.itemCode" class="item-code">[{{ h.itemCode }}]</span>
-              <strong>{{ h.quantity }}</strong> 个{{ getMaterialName(h.materialId) }}
+              <span v-if="h.item_code" class="item-code">[{{ h.item_code }}]</span>
+              <strong>{{ h.quantity }}</strong> 个{{ h.material_name || getMaterialName(h.material_id) }}
             </template>
             <template v-else>
               归还
-              <span v-if="h.itemCode" class="item-code">[{{ h.itemCode }}]</span>
-              <strong>{{ h.quantity }}</strong> 个{{ getMaterialName(h.materialId) }}
-              <span v-if="h.returnedBy"> (归还人: {{ h.returnedBy }})</span>
+              <span v-if="h.item_code" class="item-code">[{{ h.item_code }}]</span>
+              <strong>{{ h.quantity }}</strong> 个{{ h.material_name || getMaterialName(h.material_id) }}
+              <span v-if="h.returned_by"> (归还人: {{ h.returned_by }})</span>
             </template>
           </span>
-          <span class="history-time">{{ formatTime(h.timestamp) }}</span>
+          <span class="history-time">{{ formatTime(h.created_at) }}</span>
         </li>
       </ul>
     </div>
@@ -35,19 +35,18 @@
 import { ref } from 'vue'
 
 const props = defineProps({
-  history: Array
+  history: Array,
+  materials: Array
 })
 
 const open = ref(false)
 
 function getMaterialName(id) {
-  const map = {
-    'ac-remote': '🎮空调遥控器',
-    'water': '💧饮用水',
-    'tissues': '🧻纸巾',
-    'pens': '🖊️笔'
+  if (props.materials) {
+    const m = props.materials.find(x => x.id === id)
+    if (m) return (m.icon || '') + m.name
   }
-  return map[id] || '未知物资'
+  return '未知物资'
 }
 
 function formatTime(iso) {

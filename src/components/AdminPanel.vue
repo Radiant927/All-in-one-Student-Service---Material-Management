@@ -51,6 +51,44 @@
             <button class="btn-tool" @click="$emit('toggle-import')">📥 导入 Excel</button>
           </div>
 
+          <h3 style="margin-top:20px;">📧 邮件通知设置</h3>
+          <div class="admin-material-item">
+            <div class="admin-row">
+              <label>SMTP服务器</label>
+              <input v-model="smtpConfig.host" placeholder="smtp.qq.com">
+            </div>
+            <div class="admin-row">
+              <label>端口</label>
+              <input type="number" v-model.number="smtpConfig.port" placeholder="587">
+            </div>
+            <div class="admin-row">
+              <label>用户名</label>
+              <input v-model="smtpConfig.user" placeholder="邮箱地址">
+            </div>
+            <div class="admin-row">
+              <label>授权码</label>
+              <input type="password" v-model="smtpConfig.pass" placeholder="SMTP授权码">
+            </div>
+            <div class="admin-row">
+              <label>发件人</label>
+              <input v-model="smtpConfig.from" placeholder="发件邮箱">
+            </div>
+            <div class="admin-row">
+              <label>收件人</label>
+              <input v-model="smtpConfig.to" placeholder="采购负责人邮箱">
+            </div>
+            <div class="admin-row-btns">
+              <button class="btn-save-admin" @click="saveSmtp">💾 保存</button>
+              <button class="btn-test-email" @click="showTestEmail = true" :disabled="!smtpConfig.host">📧 测试</button>
+            </div>
+            <div v-if="showTestEmail" class="test-email-row">
+              <input v-model="testEmailAddr" placeholder="输入测试收件邮箱" class="form-input" style="flex:1">
+              <button class="btn-save-admin" @click="sendTest" :disabled="sendingTest">发送</button>
+              <button class="btn-cancel" @click="showTestEmail = false">取消</button>
+            </div>
+            <p v-if="smtpMsg" class="smtp-msg" :class="smtpOk ? 'ok' : 'err'">{{ smtpMsg }}</p>
+          </div>
+
           <button class="btn-logout" @click="$emit('logout')">🚪 退出管理</button>
         </div>
       </div>
@@ -60,6 +98,7 @@
 
 <script setup>
 import { ref, reactive, watch } from 'vue'
+import { fetchSettings, updateSettings, testEmail } from '../api/admin.js'
 
 const props = defineProps({
   visible: Boolean,
@@ -75,17 +114,68 @@ const loggingIn = ref(false)
 
 const editValues = reactive({})
 
+// SMTP config
+const smtpConfig = reactive({
+  host: '', port: 587, user: '', pass: '', from: '', to: ''
+})
+const showTestEmail = ref(false)
+const testEmailAddr = ref('')
+const sendingTest = ref(false)
+const smtpMsg = ref('')
+const smtpOk = ref(false)
+
+async function loadSmtpSettings() {
+  const res = await fetchSettings()
+  if (res.ok && res.data) {
+    smtpConfig.host = res.data.smtp_host || ''
+    smtpConfig.port = parseInt(res.data.smtp_port) || 587
+    smtpConfig.user = res.data.smtp_user || ''
+    smtpConfig.pass = res.data.smtp_pass || ''
+    smtpConfig.from = res.data.smtp_from || ''
+    smtpConfig.to = res.data.smtp_to || ''
+  }
+}
+
+async function saveSmtp() {
+  const data = {
+    smtp_host: smtpConfig.host,
+    smtp_port: String(smtpConfig.port),
+    smtp_user: smtpConfig.user,
+    smtp_pass: smtpConfig.pass,
+    smtp_from: smtpConfig.from,
+    smtp_to: smtpConfig.to,
+  }
+  const res = await updateSettings(data)
+  smtpMsg.value = res.ok ? 'SMTP设置已保存' : '保存失败'
+  smtpOk.value = res.ok
+  setTimeout(() => { smtpMsg.value = '' }, 3000)
+}
+
+async function sendTest() {
+  if (!testEmailAddr.value) return
+  sendingTest.value = true
+  const res = await testEmail(testEmailAddr.value)
+  smtpMsg.value = res.msg
+  smtpOk.value = res.ok
+  sendingTest.value = false
+  setTimeout(() => { smtpMsg.value = '' }, 4000)
+}
+
 watch(() => props.visible, (v) => {
   if (v) {
     password.value = ''
     errorVisible.value = false
     loggingIn.value = false
+    showTestEmail.value = false
+    testEmailAddr.value = ''
+    smtpMsg.value = ''
     props.materials.forEach(m => {
       editValues[m.id] = {
         total: m.totalQuantity || 0,
         threshold: m.lowStockThreshold || 0
       }
     })
+    if (props.loggedIn) loadSmtpSettings()
   }
 })
 
@@ -183,4 +273,23 @@ function getRemaining(m) {
 }
 .btn-primary:hover { box-shadow: 0 6px 22px rgba(102,126,234,0.45); transform: translateY(-1px); }
 .btn-primary:disabled { background: #ccd0d8; box-shadow: none; cursor: not-allowed; transform: none; }
+
+.admin-row-btns { display: flex; gap: 8px; margin-top: 6px; }
+.btn-test-email {
+  padding: 8px 16px; border-radius: 8px; border: 1.5px solid #dde4ed;
+  background: #fff; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; color: #5a6b7d; transition: all 0.3s; white-space: nowrap;
+}
+.btn-test-email:hover:not(:disabled) { border-color: #667eea; color: #667eea; }
+.btn-test-email:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-cancel {
+  padding: 8px 12px; border-radius: 8px; border: none;
+  background: #f1f5f9; font-size: 0.8rem; cursor: pointer;
+  color: #5a6b7d; white-space: nowrap;
+}
+.btn-cancel:hover { background: #e2e8f0; }
+.test-email-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.smtp-msg { font-size: 0.78rem; margin-top: 8px; padding: 6px 10px; border-radius: 8px; }
+.smtp-msg.ok { color: #059669; background: #d1fae5; }
+.smtp-msg.err { color: #dc2626; background: #fef2f2; }
 </style>

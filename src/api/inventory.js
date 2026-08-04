@@ -23,3 +23,7 @@ export function createInventoryBatch(data) {
 export function updateInventoryBatch(id, data) {
   return apiPut(`/inventory/batches/${id}`, data)
 }
+
+export function inbound(data) {
+  return apiPost('/inbound', data)
+}

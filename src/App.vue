@@ -9,19 +9,55 @@
 
   <div id="app">
     <AppHeader
+        :alert-badge="alertCount"
         @toggle-admin="showAdminPanel = true"
         @toggle-archive="showArchiveForm = true"
         @toggle-import="showImportModal = true"
+        @toggle-warehouse="toggleView"
+        @toggle-reports="toggleReports"
       />
 
+    <AlertBanner
+      v-if="currentView === 'all' && allAlerts.length > 0"
+      :alerts="allAlerts"
+      :critical-count="dashboardAlerts?.critical_count || 0"
+      :warning-count="dashboardAlerts?.warning_count || 0"
+      @view-reports="currentView = 'reports'"
+    />
+
     <StatsRow
+      v-if="currentView === 'all'"
       :total-types="totalTypes"
       :durable-count="durableCount"
       :consumable-count="consumableCount"
       :available-count="availableCount"
+      :alert-count="alertCount"
     />
 
-    <div class="card-grid">
+    <!-- Warehouse View -->
+    <WarehousePage
+      v-if="currentView === 'warehouse'"
+      @view-detail="openWarehouseDetail"
+      @view-all="currentView = 'all'"
+    />
+
+    <!-- Warehouse Detail -->
+    <WarehouseDetail
+      v-if="currentView === 'detail'"
+      :warehouse-id="detailWarehouseId"
+      @back="currentView = 'warehouse'"
+      @inbound="openInboundModal"
+      @transfer="openTransferModal"
+    />
+
+    <!-- Reports Page -->
+    <ReportsPage
+      v-if="currentView === 'reports'"
+      :toast="toast"
+      @back="currentView = 'all'"
+    />
+
+    <div v-if="currentView === 'all'" class="card-grid">
       <template v-if="durableMaterials.length > 0">
         <div class="category-section">
           <div class="category-header">
@@ -64,7 +100,7 @@
       </template>
     </div>
 
-    <HistorySection :history="recentHistory" />
+    <HistorySection v-if="currentView === 'all'" :history="recentHistory" :materials="materials" />
     <footer class="footer">© 2026 一站式物资管理系统 · 数据已持久化存储</footer>
   </div>
 
@@ -156,6 +192,20 @@
     :visible="showLocationManager"
     @close="showLocationManager = false"
   />
+
+  <InboundModal
+    :visible="inboundModalVisible"
+    :preselected-warehouse-id="inboundWarehouseId"
+    @close="inboundModalVisible = false"
+    @done="handleInboundDone"
+  />
+
+  <TransferModal
+    :visible="transferModalVisible"
+    :preselected-warehouse-id="transferWarehouseId"
+    @close="transferModalVisible = false"
+    @done="handleTransferDone"
+  />
 </template>
 
 <script setup>
@@ -176,6 +226,12 @@ import AdminPanel from './components/AdminPanel.vue'
 import MaterialArchiveForm from './components/MaterialArchiveForm.vue'
 import ImportExcelModal from './components/ImportExcelModal.vue'
 import LocationManager from './components/LocationManager.vue'
+import WarehousePage from './components/WarehousePage.vue'
+import WarehouseDetail from './components/WarehouseDetail.vue'
+import InboundModal from './components/InboundModal.vue'
+import TransferModal from './components/TransferModal.vue'
+import AlertBanner from './components/AlertBanner.vue'
+import ReportsPage from './components/ReportsPage.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import QRCode from 'qrcode'
 
@@ -185,7 +241,9 @@ const {
   getRemaining, getMaterial, getAvailableItems, getBorrowedItems,
   borrowItem, borrowIndividualItem, returnItem, returnIndividualItem,
   updateTotalQuantity, updateThreshold, addRemoteItems, removeRemoteItem,
-  verifyPassword, loadAll, loadItemsForMaterial, createMaterial, updateMaterial
+  verifyPassword, loadAll, loadItemsForMaterial, createMaterial, updateMaterial,
+  loadWarehouseStats, transfer, inbound,
+  alertCount, allAlerts, dashboardAlerts, sendReportEmail
 } = useStore()
 
 const toastRef = ref(null)
@@ -432,6 +490,53 @@ function handleImported() {
 // Location manager
 const showLocationManager = ref(false)
 
+// Warehouse view
+const currentView = ref('all')
+const detailWarehouseId = ref(null)
+const inboundModalVisible = ref(false)
+const inboundWarehouseId = ref(null)
+const transferModalVisible = ref(false)
+const transferWarehouseId = ref(null)
+
+function toggleView() {
+  if (currentView.value === 'all') {
+    currentView.value = 'warehouse'
+  } else {
+    currentView.value = 'all'
+  }
+}
+
+function toggleReports() {
+  currentView.value = currentView.value === 'reports' ? 'all' : 'reports'
+}
+
+function openWarehouseDetail(warehouseId) {
+  detailWarehouseId.value = warehouseId
+  currentView.value = 'detail'
+}
+
+function openInboundModal(warehouseId) {
+  inboundWarehouseId.value = warehouseId
+  inboundModalVisible.value = true
+}
+
+function handleInboundDone(res) {
+  inboundModalVisible.value = false
+  toast(res.msg || '入库成功', 'success')
+  loadAll()
+}
+
+function openTransferModal(warehouseId) {
+  transferWarehouseId.value = warehouseId
+  transferModalVisible.value = true
+}
+
+function handleTransferDone(res) {
+  transferModalVisible.value = false
+  toast(res.msg || '调拨成功', 'success')
+  loadAll()
+}
+
 // ESC to close modals
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return
@@ -443,5 +548,8 @@ document.addEventListener('keydown', (e) => {
   showAddRemoteModal.value = false
   showAdminPanel.value = false
   managementVisible.value = false
+  inboundModalVisible.value = false
+  transferModalVisible.value = false
+  showImportModal.value = false
 })
 </script>

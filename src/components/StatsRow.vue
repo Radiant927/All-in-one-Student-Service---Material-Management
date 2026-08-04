@@ -28,6 +28,13 @@
         <div class="stat-value">{{ availableCount }} 件</div>
       </div>
     </div>
+    <div class="stat-tile alert-tile" v-if="alertCount > 0">
+      <div class="stat-icon red">⚠️</div>
+      <div>
+        <div class="stat-label">库存预警</div>
+        <div class="stat-value alert-value">{{ alertCount }} 种</div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -36,7 +43,8 @@ defineProps({
   totalTypes: Number,
   durableCount: Number,
   consumableCount: Number,
-  availableCount: Number
+  availableCount: Number,
+  alertCount: { type: Number, default: 0 }
 })
 </script>
 
@@ -61,6 +69,8 @@ defineProps({
 .stat-icon.blue { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #667eea; }
 .stat-icon.orange { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #d97706; }
 .stat-icon.green { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #059669; }
+.stat-icon.red { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #dc2626; }
+.alert-value { color: #dc2626; }
 .stat-label { font-size: 0.82rem; color: #5a6b7d; margin-bottom: 2px; }
 .stat-value { font-size: 1.55rem; font-weight: 700; color: #1a2332; }
 

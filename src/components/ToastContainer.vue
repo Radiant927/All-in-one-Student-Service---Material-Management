@@ -18,7 +18,7 @@ import { ref } from 'vue'
 
 const toasts = ref([])
 let idCounter = 0
-const iconMap = { success: '✅', error: '❌', info: 'ℹ️' }
+const iconMap = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' }
 
 function show(message, type = 'info') {
   const id = ++idCounter
@@ -46,6 +46,7 @@ defineExpose({ show })
 .toast.success { background: linear-gradient(135deg, #22c55e, #16a34a); }
 .toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
 .toast.info { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.toast.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(-20px) scale(0.94); }
   to { opacity: 1; transform: translateY(0) scale(1); }

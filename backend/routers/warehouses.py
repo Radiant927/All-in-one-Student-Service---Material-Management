@@ -117,3 +117,146 @@ def delete_location(location_id: int, db: Session = Depends(get_db)):
     db.delete(l)
     db.commit()
     return {"ok": True, "data": None, "msg": "储位已删除"}
+
+
+@router.get("/warehouses/stats")
+def warehouse_stats(db: Session = Depends(get_db)):
+    from models import Warehouse, InventoryBatch, InventoryItem, Material
+    from sqlalchemy import func
+
+    warehouses = db.query(Warehouse).all()
+    data = []
+    for w in warehouses:
+        # Count materials that have inventory in this warehouse
+        batch_material_ids = set(
+            r[0] for r in db.query(InventoryBatch.material_id).filter(
+                InventoryBatch.warehouse_id == w.id,
+                InventoryBatch.quantity > 0
+            ).all()
+        )
+        item_material_ids = set(
+            r[0] for r in db.query(InventoryItem.material_id).filter(
+                InventoryItem.warehouse_id == w.id
+            ).all()
+        )
+        material_ids = batch_material_ids | item_material_ids
+
+        # Total quantity
+        batch_qty = db.query(func.sum(InventoryBatch.quantity)).filter(
+            InventoryBatch.warehouse_id == w.id
+        ).scalar() or 0
+        item_qty = db.query(InventoryItem).filter(
+            InventoryItem.warehouse_id == w.id
+        ).count()
+        total_qty = batch_qty + item_qty
+
+        # Low stock count
+        low_stock = 0
+        for mid in material_ids:
+            m = db.query(Material).filter(Material.id == mid).first()
+            if not m:
+                continue
+            if m.has_individual_tracking:
+                available = db.query(InventoryItem).filter(
+                    InventoryItem.material_id == mid,
+                    InventoryItem.warehouse_id == w.id,
+                    InventoryItem.status == "available"
+                ).count()
+            else:
+                available = db.query(func.sum(InventoryBatch.quantity)).filter(
+                    InventoryBatch.material_id == mid,
+                    InventoryBatch.warehouse_id == w.id
+                ).scalar() or 0
+            if available <= m.low_stock_threshold:
+                low_stock += 1
+
+        data.append({
+            "id": w.id,
+            "name": w.name,
+            "location_desc": w.location_desc,
+            "materials_count": len(material_ids),
+            "total_quantity": total_qty,
+            "low_stock_count": low_stock,
+        })
+
+    return {"ok": True, "data": data, "msg": ""}
+
+
+@router.get("/warehouses/{warehouse_id}/detail")
+def warehouse_detail(warehouse_id: int, db: Session = Depends(get_db)):
+    from models import Warehouse, StorageLocation, Material, InventoryBatch, InventoryItem
+    from sqlalchemy import func
+
+    w = db.query(Warehouse).filter(Warehouse.id == warehouse_id).first()
+    if not w:
+        raise HTTPException(status_code=404, detail="仓库不存在")
+
+    # Locations
+    locs = db.query(StorageLocation).filter(
+        StorageLocation.warehouse_id == warehouse_id
+    ).all()
+    locations_data = [{
+        "id": l.id, "shelf": l.shelf, "level": l.level,
+        "position": l.position, "full_code": l.full_code
+    } for l in locs]
+
+    # Materials in this warehouse
+    materials_data = []
+    # From batches
+    batches = db.query(InventoryBatch).filter(
+        InventoryBatch.warehouse_id == warehouse_id,
+        InventoryBatch.quantity > 0
+    ).all()
+    seen_material_ids = set()
+    for b in batches:
+        m = db.query(Material).filter(Material.id == b.material_id).first()
+        if not m or m.id in seen_material_ids:
+            continue
+        seen_material_ids.add(m.id)
+        loc = db.query(StorageLocation).filter(
+            StorageLocation.id == b.location_id
+        ).first() if b.location_id else None
+        materials_data.append({
+            "id": m.id, "name": m.name, "spec": m.spec, "unit": m.unit,
+            "icon": m.icon, "color_idx": m.color_idx,
+            "category": m.category, "sub_category": m.sub_category,
+            "has_individual_tracking": bool(m.has_individual_tracking),
+            "low_stock_threshold": m.low_stock_threshold,
+            "total_quantity": b.quantity,
+            "location_code": loc.full_code if loc else "",
+            "location_id": b.location_id,
+        })
+
+    # From individual items
+    items = db.query(InventoryItem).filter(
+        InventoryItem.warehouse_id == warehouse_id
+    ).all()
+    for item in items:
+        if item.material_id in seen_material_ids:
+            continue
+        seen_material_ids.add(item.material_id)
+        m = db.query(Material).filter(Material.id == item.material_id).first()
+        if not m:
+            continue
+        total = db.query(InventoryItem).filter(
+            InventoryItem.material_id == m.id,
+            InventoryItem.warehouse_id == warehouse_id
+        ).count()
+        loc = db.query(StorageLocation).filter(
+            StorageLocation.id == item.location_id
+        ).first() if item.location_id else None
+        materials_data.append({
+            "id": m.id, "name": m.name, "spec": m.spec, "unit": m.unit,
+            "icon": m.icon, "color_idx": m.color_idx,
+            "category": m.category, "sub_category": m.sub_category,
+            "has_individual_tracking": bool(m.has_individual_tracking),
+            "low_stock_threshold": m.low_stock_threshold,
+            "total_quantity": total,
+            "location_code": loc.full_code if loc else "",
+            "location_id": item.location_id,
+        })
+
+    return {"ok": True, "data": {
+        "id": w.id, "name": w.name, "location_desc": w.location_desc,
+        "materials": materials_data, "locations": locations_data,
+    }, "msg": ""}

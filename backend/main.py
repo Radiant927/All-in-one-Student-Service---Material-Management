@@ -1,7 +1,18 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import engine, Base
+
+# Load .env from project root
+try:
+    from dotenv import load_dotenv
+    _env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    if os.path.exists(_env_path):
+        load_dotenv(_env_path)
+except ImportError:
+    pass
+
 from seed import seed
 
 
@@ -22,7 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import materials, warehouses, inventory, borrow, import_, admin
+from routers import materials, warehouses, inventory, borrow, import_, admin, transfer, reports
 
 app.include_router(materials.router, prefix="/api", tags=["Materials"])
 app.include_router(warehouses.router, prefix="/api", tags=["Warehouses"])
@@ -30,6 +41,8 @@ app.include_router(inventory.router, prefix="/api", tags=["Inventory"])
 app.include_router(borrow.router, prefix="/api", tags=["Borrow"])
 app.include_router(import_.router, prefix="/api", tags=["Import"])
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
+app.include_router(transfer.router, prefix="/api", tags=["Transfer"])
+app.include_router(reports.router, prefix="/api", tags=["Reports"])
 
 
 @app.get("/api/health")

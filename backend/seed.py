@@ -1,6 +1,7 @@
 from datetime import datetime
 from database import SessionLocal
 from models import Warehouse, StorageLocation, Material, InventoryItem, InventoryBatch, BorrowHistory, AdminSetting
+import os
 
 
 def seed():
@@ -89,7 +90,8 @@ def seed():
 
         # Admin settings
         if db.query(AdminSetting).count() == 0:
-            db.add(AdminSetting(key="password", value="admin888"))
+            admin_password = os.getenv("ADMIN_PASSWORD", "admin888")
+            db.add(AdminSetting(key="password", value=admin_password))
 
         db.commit()
         print("Seed data inserted successfully.")

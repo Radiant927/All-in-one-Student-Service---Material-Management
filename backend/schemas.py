@@ -183,6 +183,49 @@ class ApiResponse(BaseModel):
     msg: str = ""
 
 
+# --- Transfer ---
+class TransferRequest(BaseModel):
+    material_id: int
+    from_warehouse_id: int
+    to_warehouse_id: int
+    quantity: int = 1
+    location_id: Optional[int] = None
+
+
+# --- Inbound ---
+class InboundRequest(BaseModel):
+    material_id: int
+    warehouse_id: int
+    location_id: Optional[int] = None
+    quantity: int = 1
+
+
+# --- Warehouse Stats ---
+class WarehouseStatsOut(BaseModel):
+    id: int
+    name: str
+    location_desc: str
+    materials_count: int = 0
+    total_quantity: int = 0
+    low_stock_count: int = 0
+
+
+class WarehouseDetailOut(BaseModel):
+    id: int
+    name: str
+    location_desc: str
+    materials: list = []
+    locations: list = []
+
+
+# --- Material Warehouse Breakdown ---
+class MaterialWarehouseBreakdown(BaseModel):
+    warehouse_id: int
+    warehouse_name: str
+    quantity: int = 0
+    location_code: Optional[str] = ""
+
+
 # --- Import ---
 class ImportResult(BaseModel):
     imported: int = 0
