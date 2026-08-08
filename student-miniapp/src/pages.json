@@ -1,0 +1,28 @@
+{
+  "pages": [
+    { "path": "pages/login/index", "style": { "navigationBarTitleText": "统一认证" } },
+    { "path": "pages/home/index", "style": { "navigationBarTitleText": "物资服务" } },
+    { "path": "pages/material-detail/index", "style": { "navigationBarTitleText": "物资详情" } },
+    { "path": "pages/application-create/index", "style": { "navigationBarTitleText": "借用申请" } },
+    { "path": "pages/scan/index", "style": { "navigationBarTitleText": "扫码识别" } },
+    { "path": "pages/my-applications/index", "style": { "navigationBarTitleText": "我的申请" } },
+    { "path": "pages/profile/index", "style": { "navigationBarTitleText": "个人中心" } }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "一站式物资服务",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f4f7fb"
+  },
+  "tabBar": {
+    "color": "#64748b",
+    "selectedColor": "#4f46e5",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "物资" },
+      { "pagePath": "pages/scan/index", "text": "扫码" },
+      { "pagePath": "pages/my-applications/index", "text": "申请" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  }
+}
+

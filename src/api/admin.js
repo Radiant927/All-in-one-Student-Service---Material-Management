@@ -1,7 +1,9 @@
-import { apiPost, apiPut, apiGet } from './client.js'
+import { apiPost, apiPut, apiGet, setAuthTokens } from './client.js'
 
-export function verifyPassword(password) {
-  return apiPost('/admin/verify', { password })
+export async function verifyPassword(password) {
+  const result = await apiPost('/admin/verify', { password })
+  if (result.ok && result.data) setAuthTokens(result.data)
+  return result
 }
 
 export function changePassword(oldPassword, newPassword) {
