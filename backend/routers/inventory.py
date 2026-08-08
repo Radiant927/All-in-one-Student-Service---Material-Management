@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 from database import get_db
+from constants import UserRole
+from models import User
+from security import require_roles
 from schemas import InventoryItemCreate, InventoryBatchCreate, InventoryBatchUpdate, InboundRequest, ApiResponse
 from services.inventory_service import get_material_inventory_summary, get_inventory_items, get_inventory_batches
 
@@ -118,8 +121,12 @@ def update_inventory_batch(batch_id: int, body: InventoryBatchUpdate, db: Sessio
 
 
 @router.post("/inbound")
-def inbound_material(body: InboundRequest, db: Session = Depends(get_db)):
-    from models import Material, Warehouse, InventoryBatch, BorrowHistory
+def inbound_material(
+    body: InboundRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.OPERATOR.value, UserRole.ADMIN.value)),
+):
+    from models import Material, Warehouse, InventoryBatch, BorrowHistory, InventoryTransaction
     from datetime import datetime
 
     m = db.query(Material).filter(Material.id == body.material_id).first()
@@ -142,7 +149,7 @@ def inbound_material(body: InboundRequest, db: Session = Depends(get_db)):
         InventoryBatch.material_id == body.material_id,
         InventoryBatch.warehouse_id == body.warehouse_id,
         InventoryBatch.location_id == body.location_id
-    ).first()
+    ).with_for_update().first()
 
     if existing:
         existing.quantity += body.quantity
@@ -165,6 +172,13 @@ def inbound_material(body: InboundRequest, db: Session = Depends(get_db)):
         borrower="入库操作",
         warehouse_id=body.warehouse_id,
         created_at=now
+    ))
+    db.add(InventoryTransaction(
+        material_id=body.material_id,
+        warehouse_id=body.warehouse_id,
+        actor_id=current_user.id,
+        action="inbound",
+        quantity=body.quantity,
     ))
 
     db.commit()

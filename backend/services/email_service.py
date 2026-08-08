@@ -1,4 +1,5 @@
 import smtplib
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from sqlalchemy.orm import Session
@@ -13,14 +14,17 @@ def _get_setting(db: Session, key: str, default: str = ""):
 
 
 def get_smtp_config(db: Session):
-    """Read SMTP configuration from AdminSetting."""
+    """Read SMTP configuration, preferring production environment secrets."""
+    def value(env_key, setting_key, default=""):
+        return os.getenv(env_key) or _get_setting(db, setting_key, default)
+
     return {
-        "host": _get_setting(db, "smtp_host", ""),
-        "port": int(_get_setting(db, "smtp_port", "587")),
-        "user": _get_setting(db, "smtp_user", ""),
-        "password": _get_setting(db, "smtp_pass", ""),
-        "from_email": _get_setting(db, "smtp_from", ""),
-        "to_email": _get_setting(db, "smtp_to", ""),
+        "host": value("SMTP_HOST", "smtp_host"),
+        "port": int(value("SMTP_PORT", "smtp_port", "587")),
+        "user": value("SMTP_USER", "smtp_user"),
+        "password": value("SMTP_PASSWORD", "smtp_pass"),
+        "from_email": value("SMTP_FROM", "smtp_from"),
+        "to_email": value("REPORT_EMAIL_TO", "smtp_to"),
     }
 
 

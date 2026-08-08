@@ -2,13 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from schemas import TransferRequest
+from constants import UserRole
+from models import User
+from security import require_roles
 
 router = APIRouter()
 
 
 @router.post("/transfer")
-def transfer_material(body: TransferRequest, db: Session = Depends(get_db)):
-    from models import Material, Warehouse, InventoryBatch, InventoryItem, BorrowHistory
+def transfer_material(
+    body: TransferRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.OPERATOR.value, UserRole.ADMIN.value)),
+):
+    from models import Material, Warehouse, InventoryBatch, InventoryItem, BorrowHistory, InventoryTransaction
     from datetime import datetime
 
     if body.from_warehouse_id == body.to_warehouse_id:
@@ -35,7 +42,7 @@ def transfer_material(body: TransferRequest, db: Session = Depends(get_db)):
             InventoryItem.material_id == body.material_id,
             InventoryItem.warehouse_id == body.from_warehouse_id,
             InventoryItem.status == "available"
-        ).limit(body.quantity).all()
+        ).with_for_update().limit(body.quantity).all()
 
         if len(items) < body.quantity:
             return {"ok": False, "data": None,
@@ -54,6 +61,13 @@ def transfer_material(body: TransferRequest, db: Session = Depends(get_db)):
             warehouse_id=body.to_warehouse_id,
             created_at=now
         ))
+        db.add(InventoryTransaction(
+            material_id=body.material_id,
+            warehouse_id=body.to_warehouse_id,
+            actor_id=current_user.id,
+            action="transfer",
+            quantity=body.quantity,
+        ))
         db.commit()
         return {"ok": True, "data": None,
                 "msg": f"成功调拨 {body.quantity} 个 {m.name} 从 {from_wh.name} 到 {to_wh.name}"}
@@ -64,7 +78,7 @@ def transfer_material(body: TransferRequest, db: Session = Depends(get_db)):
             InventoryBatch.material_id == body.material_id,
             InventoryBatch.warehouse_id == body.from_warehouse_id,
             InventoryBatch.quantity > 0
-        ).order_by(InventoryBatch.id).all()
+        ).order_by(InventoryBatch.id).with_for_update().all()
 
         total_available = sum(b.quantity for b in batches)
         if total_available < body.quantity:
@@ -114,6 +128,13 @@ def transfer_material(body: TransferRequest, db: Session = Depends(get_db)):
             returned_by=to_wh.name,
             warehouse_id=body.to_warehouse_id,
             created_at=now
+        ))
+        db.add(InventoryTransaction(
+            material_id=body.material_id,
+            warehouse_id=body.to_warehouse_id,
+            actor_id=current_user.id,
+            action="transfer",
+            quantity=body.quantity,
         ))
         db.commit()
         return {"ok": True, "data": None,

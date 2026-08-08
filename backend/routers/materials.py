@@ -16,6 +16,7 @@ def list_materials(
 ):
     from models import Material
     from services.inventory_service import get_material_inventory_summary
+    from services.borrow_application_service import material_available_quantity
 
     query = db.query(Material)
     if category:
@@ -31,7 +32,7 @@ def list_materials(
         summary = get_material_inventory_summary(db, m.id)
         d["total_quantity"] = summary["total_quantity"]
         d["borrowed_quantity"] = summary["borrowed_quantity"]
-        d["available_quantity"] = summary["available_quantity"]
+        d["available_quantity"] = material_available_quantity(db, m)
         d["has_individual_tracking"] = bool(m.has_individual_tracking)
         result.append(d)
 
@@ -45,6 +46,7 @@ def list_materials(
 def get_material(material_id: int, db: Session = Depends(get_db)):
     from models import Material
     from services.inventory_service import get_material_inventory_summary
+    from services.borrow_application_service import material_available_quantity
 
     m = db.query(Material).filter(Material.id == material_id).first()
     if not m:
@@ -54,7 +56,7 @@ def get_material(material_id: int, db: Session = Depends(get_db)):
     summary = get_material_inventory_summary(db, m.id)
     d["total_quantity"] = summary["total_quantity"]
     d["borrowed_quantity"] = summary["borrowed_quantity"]
-    d["available_quantity"] = summary["available_quantity"]
+    d["available_quantity"] = material_available_quantity(db, m)
     d["has_individual_tracking"] = bool(m.has_individual_tracking)
     return {"ok": True, "data": d, "msg": ""}
 

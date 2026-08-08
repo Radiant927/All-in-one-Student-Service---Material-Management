@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from models import Material, InventoryItem, InventoryBatch, BorrowHistory, Warehouse, StorageLocation
+from models import Material, InventoryItem, InventoryBatch, BorrowHistory, InventoryTransaction, Warehouse, StorageLocation
+from time_utils import utcnow, utcnow_iso
 
 
 def get_material_inventory_summary(db: Session, material_id: int):
@@ -75,9 +76,10 @@ def get_inventory_items(db: Session, material_id: int, status: str = None, searc
 
 
 def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
-                    item_code: str = None, warehouse_id: int = None):
-    from datetime import datetime
-    now = datetime.now().isoformat()
+                    item_code: str = None, warehouse_id: int = None, commit: bool = True,
+                    reservation_application_id: int = None, actor_id: int = None,
+                    record_transaction: bool = True):
+    now = utcnow_iso()
     m = db.query(Material).filter(Material.id == material_id).first()
     if not m:
         return {"ok": False, "msg": "物资不存在"}
@@ -88,11 +90,24 @@ def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
         item = db.query(InventoryItem).filter(
             InventoryItem.material_id == material_id,
             InventoryItem.code == item_code
-        ).first()
+        ).with_for_update().first()
         if not item:
             return {"ok": False, "msg": f"遥控器 {item_code} 不存在"}
         if item.status == "borrowed":
             return {"ok": False, "msg": f"遥控器 {item_code} 已被借出"}
+        from models import InventoryReservation
+        reservation_query = db.query(InventoryReservation).filter(
+            InventoryReservation.material_id == material_id,
+            InventoryReservation.item_code == item_code,
+            InventoryReservation.active.is_(True),
+            InventoryReservation.expires_at > utcnow(),
+        )
+        if reservation_application_id is not None:
+            reservation_query = reservation_query.filter(
+                InventoryReservation.application_id != reservation_application_id
+            )
+        if reservation_query.first():
+            return {"ok": False, "msg": f"遥控器 {item_code} 已被其他申请预留"}
         if not borrower.strip():
             return {"ok": False, "msg": "请输入借用人姓名"}
         item.status = "borrowed"
@@ -101,11 +116,27 @@ def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
         db.add(BorrowHistory(material_id=material_id, action="borrow", quantity=1,
                              borrower=borrower.strip(), item_code=item_code,
                              warehouse_id=item.warehouse_id, created_at=now))
-        db.commit()
+        if record_transaction:
+            db.add(InventoryTransaction(
+                material_id=material_id, warehouse_id=item.warehouse_id, actor_id=actor_id,
+                action="borrow", quantity=1, item_code=item_code,
+            ))
+        db.commit() if commit else db.flush()
         return {"ok": True, "msg": f"成功借出遥控器 {item_code}"}
     else:
         # Bulk material borrow
+        from models import InventoryReservation
         total_available = get_material_inventory_summary(db, material_id)["total_quantity"]
+        reservation_query = db.query(func.sum(InventoryReservation.quantity)).filter(
+            InventoryReservation.material_id == material_id,
+            InventoryReservation.active.is_(True),
+            InventoryReservation.expires_at > utcnow(),
+        )
+        if reservation_application_id is not None:
+            reservation_query = reservation_query.filter(
+                InventoryReservation.application_id != reservation_application_id
+            )
+        total_available -= reservation_query.scalar() or 0
         if quantity > total_available:
             return {"ok": False, "msg": f"库存不足，仅剩 {total_available} 个"}
         if quantity <= 0:
@@ -117,7 +148,7 @@ def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
         batches_query = db.query(InventoryBatch).filter(
             InventoryBatch.material_id == material_id,
             InventoryBatch.quantity > 0
-        )
+        ).with_for_update()
 
         # Order batches by warehouse priority:
         # - recyclable items: recycling warehouse first, then main warehouse
@@ -166,14 +197,19 @@ def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
                              borrower=borrower.strip(),
                              warehouse_id=warehouse_id or used_warehouse_id,
                              created_at=now))
-        db.commit()
+        if record_transaction:
+            db.add(InventoryTransaction(
+                material_id=material_id, warehouse_id=warehouse_id or used_warehouse_id,
+                actor_id=actor_id, action="borrow", quantity=quantity,
+            ))
+        db.commit() if commit else db.flush()
         return {"ok": True, "msg": f"成功借出 {quantity} 个{m.name}"}
 
 
 def return_material(db: Session, material_id: int, quantity: int, returned_by: str,
-                    item_code: str = None, warehouse_id: int = None):
-    from datetime import datetime
-    now = datetime.now().isoformat()
+                    item_code: str = None, warehouse_id: int = None, commit: bool = True,
+                    actor_id: int = None, record_transaction: bool = True):
+    now = utcnow_iso()
     m = db.query(Material).filter(Material.id == material_id).first()
     if not m:
         return {"ok": False, "msg": "物资不存在"}
@@ -184,7 +220,7 @@ def return_material(db: Session, material_id: int, quantity: int, returned_by: s
         item = db.query(InventoryItem).filter(
             InventoryItem.material_id == material_id,
             InventoryItem.code == item_code
-        ).first()
+        ).with_for_update().first()
         if not item:
             return {"ok": False, "msg": f"遥控器 {item_code} 不存在"}
         if item.status == "available":
@@ -197,7 +233,12 @@ def return_material(db: Session, material_id: int, quantity: int, returned_by: s
         db.add(BorrowHistory(material_id=material_id, action="return", quantity=1,
                              returned_by=returned_by.strip(), item_code=item_code,
                              warehouse_id=item.warehouse_id, created_at=now))
-        db.commit()
+        if record_transaction:
+            db.add(InventoryTransaction(
+                material_id=material_id, warehouse_id=item.warehouse_id, actor_id=actor_id,
+                action="return", quantity=1, item_code=item_code,
+            ))
+        db.commit() if commit else db.flush()
         return {"ok": True, "msg": f"成功归还遥控器 {item_code}"}
     else:
         total_borrowed = get_material_inventory_summary(db, material_id)["borrowed_quantity"]
@@ -234,5 +275,10 @@ def return_material(db: Session, material_id: int, quantity: int, returned_by: s
 
         db.add(BorrowHistory(material_id=material_id, action="return", quantity=quantity,
                              returned_by=returned_by.strip(), warehouse_id=target_warehouse_id, created_at=now))
-        db.commit()
+        if record_transaction:
+            db.add(InventoryTransaction(
+                material_id=material_id, warehouse_id=target_warehouse_id, actor_id=actor_id,
+                action="return", quantity=quantity,
+            ))
+        db.commit() if commit else db.flush()
         return {"ok": True, "msg": f"成功归还 {quantity} 个{m.name}"}

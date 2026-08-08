@@ -1,6 +1,9 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, UniqueConstraint, Index
+import uuid
+
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from database import Base
+from time_utils import utcnow
 
 
 class Warehouse(Base):
@@ -35,6 +38,7 @@ class Material(Base):
     __tablename__ = "materials"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    public_id = Column(String(36), nullable=False, unique=True, index=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(200), nullable=False, unique=True)
     spec = Column(String(200), default="")
     unit = Column(String(20), nullable=False, default="个")
@@ -108,3 +112,114 @@ class AdminSetting(Base):
 
     key = Column(String(50), primary_key=True)
     value = Column(String(500), nullable=False)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    external_subject = Column(String(200), nullable=False, unique=True, index=True)
+    student_no = Column(String(50), nullable=True, unique=True, index=True)
+    name = Column(String(100), nullable=False)
+    role = Column(String(20), nullable=False, default="student", index=True)
+    status = Column(String(20), nullable=False, default="active", index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    borrow_applications = relationship(
+        "BorrowApplication", foreign_keys="BorrowApplication.applicant_id", back_populates="applicant"
+    )
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    user = relationship("User", back_populates="refresh_tokens")
+
+
+class BorrowApplication(Base):
+    __tablename__ = "borrow_applications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    applicant_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    item_code = Column(String(100), nullable=True, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True, index=True)
+    status = Column(String(30), nullable=False, default="submitted", index=True)
+    purpose = Column(String(500), nullable=False, default="")
+    review_note = Column(String(500), nullable=False, default="")
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    picked_up_at = Column(DateTime(timezone=True), nullable=True)
+    returned_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    applicant = relationship("User", foreign_keys=[applicant_id], back_populates="borrow_applications")
+    approver = relationship("User", foreign_keys=[approved_by])
+    material = relationship("Material")
+    warehouse = relationship("Warehouse")
+    reservation = relationship(
+        "InventoryReservation", back_populates="application", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class InventoryReservation(Base):
+    __tablename__ = "inventory_reservations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    application_id = Column(Integer, ForeignKey("borrow_applications.id"), nullable=False, unique=True, index=True)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
+    item_code = Column(String(100), nullable=True, index=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    active = Column(Boolean, nullable=False, default=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    released_at = Column(DateTime(timezone=True), nullable=True)
+
+    application = relationship("BorrowApplication", back_populates="reservation")
+    material = relationship("Material")
+
+
+class InventoryTransaction(Base):
+    __tablename__ = "inventory_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    application_id = Column(Integer, ForeignKey("borrow_applications.id"), nullable=True, index=True)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True, index=True)
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String(20), nullable=False, index=True)
+    quantity = Column(Integer, nullable=False)
+    item_code = Column(String(100), nullable=True)
+    idempotency_key = Column(String(100), nullable=True, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+
+    application = relationship("BorrowApplication")
+    material = relationship("Material")
+    warehouse = relationship("Warehouse")
+    actor = relationship("User")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String(100), nullable=False, index=True)
+    target_type = Column(String(100), nullable=False, index=True)
+    target_id = Column(String(100), nullable=True, index=True)
+    result = Column(String(20), nullable=False, default="success", index=True)
+    detail = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+
+    actor = relationship("User")
