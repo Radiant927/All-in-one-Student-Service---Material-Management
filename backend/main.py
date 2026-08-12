@@ -33,7 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import materials, warehouses, inventory, borrow, import_, admin, transfer, reports
+from routers import materials, warehouses, inventory, borrow, import_, admin, transfer, reports, stocktake
 
 app.include_router(materials.router, prefix="/api", tags=["Materials"])
 app.include_router(warehouses.router, prefix="/api", tags=["Warehouses"])
@@ -43,6 +43,7 @@ app.include_router(import_.router, prefix="/api", tags=["Import"])
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
 app.include_router(transfer.router, prefix="/api", tags=["Transfer"])
 app.include_router(reports.router, prefix="/api", tags=["Reports"])
+app.include_router(stocktake.router, prefix="/api", tags=["Stocktake"])
 
 
 @app.get("/api/health")

@@ -108,3 +108,33 @@ class AdminSetting(Base):
 
     key = Column(String(50), primary_key=True)
     value = Column(String(500), nullable=False)
+class Stocktake(Base):
+    """盘点单：一次盘点任务"""
+    __tablename__ = "stocktakes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    status = Column(String(20), nullable=False, default="in_progress", index=True)  # in_progress / completed
+    note = Column(String(500), default="")
+    created_at = Column(String(30), nullable=False)
+    completed_at = Column(String(30), nullable=True)
+
+    entries = relationship("StocktakeEntry", back_populates="stocktake", cascade="all, delete-orphan")
+
+
+class StocktakeEntry(Base):
+    """盘点明细：每条物资的账面数 vs 实际清点数"""
+    __tablename__ = "stocktake_entries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    stocktake_id = Column(Integer, ForeignKey("stocktakes.id"), nullable=False, index=True)
+    material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    location_id = Column(Integer, ForeignKey("storage_locations.id"), nullable=True)
+    book_quantity = Column(Integer, nullable=False, default=0)   # 账面数量
+    actual_quantity = Column(Integer, nullable=True)             # 实际清点数量
+    difference = Column(Integer, nullable=False, default=0)      # 差异 = actual - book
+
+    stocktake = relationship("Stocktake", back_populates="entries")
+    material = relationship("Material")
+    warehouse = relationship("Warehouse")
+    location = relationship("StorageLocation")

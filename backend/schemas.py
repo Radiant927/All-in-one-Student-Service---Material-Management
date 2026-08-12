@@ -231,3 +231,38 @@ class ImportResult(BaseModel):
     imported: int = 0
     skipped: int = 0
     errors: List[str] = []
+
+# --- Stocktake (盘点) ---
+class StocktakeCreate(BaseModel):
+    note: str = ""
+
+class StocktakeEntryIn(BaseModel):
+    material_id: int
+    warehouse_id: int
+    location_id: Optional[int] = None
+    actual_quantity: int
+
+class StocktakeEntryOut(BaseModel):
+    id: int
+    material_id: int
+    material_name: str = ""
+    material_spec: str = ""
+    warehouse_id: int
+    warehouse_name: str = ""
+    location_id: Optional[int] = None
+    location_code: str = ""
+    book_quantity: int = 0
+    actual_quantity: Optional[int] = None
+    difference: int = 0
+
+    model_config = {"from_attributes": True}
+
+class StocktakeOut(BaseModel):
+    id: int
+    status: str
+    note: str
+    created_at: str
+    completed_at: Optional[str] = None
+    entries: List[StocktakeEntryOut] = []
+
+    model_config = {"from_attributes": True}

@@ -15,6 +15,7 @@
         @toggle-import="showImportModal = true"
         @toggle-warehouse="toggleView"
         @toggle-reports="toggleReports"
+        @toggle-stocktake="toggleStocktake"
       />
 
     <AlertBanner
@@ -54,6 +55,12 @@
     <ReportsPage
       v-if="currentView === 'reports'"
       :toast="toast"
+      @back="currentView = 'all'"
+    />
+
+    <!-- Stocktake Page -->
+    <StocktakePage
+      v-if="currentView === 'stocktake'"
       @back="currentView = 'all'"
     />
 
@@ -232,6 +239,7 @@ import InboundModal from './components/InboundModal.vue'
 import TransferModal from './components/TransferModal.vue'
 import AlertBanner from './components/AlertBanner.vue'
 import ReportsPage from './components/ReportsPage.vue'
+import StocktakePage from './components/StocktakePage.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import QRCode from 'qrcode'
 
@@ -518,6 +526,10 @@ function toggleView() {
 
 function toggleReports() {
   currentView.value = currentView.value === 'reports' ? 'all' : 'reports'
+}
+
+function toggleStocktake() {
+  currentView.value = currentView.value === 'stocktake' ? 'all' : 'stocktake'
 }
 
 function openWarehouseDetail(warehouseId) {
