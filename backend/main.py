@@ -138,7 +138,7 @@ app.add_middleware(
 
 from routers import (
     admin, audit_logs, auth, borrow, borrow_applications, import_, inventory,
-    materials, reports, scan, transfer, users, warehouses,
+    materials, reports, scan, stocktake, transfer, users, warehouses,
 )
 
 app.include_router(materials.router, prefix="/api", tags=["Materials"])
@@ -149,6 +149,7 @@ app.include_router(import_.router, prefix="/api", tags=["Import"])
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
 app.include_router(transfer.router, prefix="/api", tags=["Transfer"])
 app.include_router(reports.router, prefix="/api", tags=["Reports"])
+app.include_router(stocktake.router, prefix="/api", tags=["Stocktake"])
 app.include_router(auth.router, prefix="/api", tags=["Auth"])
 app.include_router(audit_logs.router, prefix="/api", tags=["Audit"])
 app.include_router(borrow_applications.router, prefix="/api", tags=["Borrow Applications"])
