@@ -1,0 +1,14 @@
+{
+  "name": "一站式物资服务",
+  "appid": "__UNI__MATERIAL_SERVICE",
+  "description": "学生物资查询与借用申请小程序",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": { "urlCheck": true },
+    "usingComponents": true
+  }
+}
+

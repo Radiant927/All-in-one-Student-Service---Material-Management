@@ -4,21 +4,32 @@ from typing import Optional
 from database import get_db
 from schemas import BorrowRequest, ReturnRequest, ApiResponse
 from services.inventory_service import borrow_material, return_material
+from constants import UserRole
+from models import User
+from security import require_roles
 
 router = APIRouter()
 
 
 @router.post("/borrow")
-def borrow(body: BorrowRequest, db: Session = Depends(get_db)):
+def borrow(
+    body: BorrowRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.OPERATOR.value, UserRole.ADMIN.value)),
+):
     result = borrow_material(db, body.material_id, body.quantity, body.borrower,
-                             body.item_code, body.warehouse_id)
+                             body.item_code, body.warehouse_id, actor_id=current_user.id)
     return result
 
 
 @router.post("/return")
-def return_item(body: ReturnRequest, db: Session = Depends(get_db)):
+def return_item(
+    body: ReturnRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.OPERATOR.value, UserRole.ADMIN.value)),
+):
     result = return_material(db, body.material_id, body.quantity, body.returned_by,
-                             body.item_code, body.warehouse_id)
+                             body.item_code, body.warehouse_id, actor_id=current_user.id)
     return result
 
 

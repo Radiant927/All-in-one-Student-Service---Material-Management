@@ -25,11 +25,21 @@ dist-ssr
 
 # Python
 __pycache__/
+.venv/
 *.py[cod]
 *.pyo
 
 # Backend data (SQLite database is runtime data)
 backend/data/
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+backups/
+
+# Uni-app build output
+student-miniapp/unpackage/
+.playwright-cli/
 
 # Claude Code
 .claude/

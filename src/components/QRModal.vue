@@ -36,7 +36,7 @@ watch(() => props.visible, async (v) => {
       qrContainer.value.innerHTML = ''
       try {
         const canvas = document.createElement('canvas')
-        await QRCode.toCanvas(canvas, `MATERIAL:ac-remote:${props.itemCode}`, {
+        await QRCode.toCanvas(canvas, `ITEM:${props.itemCode}`, {
           width: 200,
           color: { dark: '#1a2332', light: '#ffffff' }
         })

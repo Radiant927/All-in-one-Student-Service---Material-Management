@@ -8,6 +8,7 @@
       <button class="btn-icon" @click="$emit('toggle-warehouse')" title="仓库视图">🏗️</button>
       <button class="btn-icon" @click="$emit('toggle-archive')" title="物资档案">📋</button>
       <button class="btn-icon" @click="$emit('toggle-import')" title="导入数据">📥</button>
+      <button class="btn-icon" @click="$emit('toggle-applications')" title="借用申请">📝</button>
       <button class="btn-icon" @click="$emit('toggle-reports')" title="补货报表">
         📊
         <span v-if="alertBadge > 0" class="badge-dot">{{ alertBadge }}</span>
@@ -18,7 +19,7 @@
 </template>
 
 <script setup>
-defineEmits(['toggle-admin', 'toggle-archive', 'toggle-import', 'toggle-warehouse', 'toggle-reports'])
+defineEmits(['toggle-admin', 'toggle-archive', 'toggle-import', 'toggle-warehouse', 'toggle-reports', 'toggle-applications'])
 defineProps({ alertBadge: { type: Number, default: 0 } })
 </script>
 
