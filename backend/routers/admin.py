@@ -7,6 +7,10 @@ from typing import Optional
 import hashlib
 import secrets
 
+from constants import UserRole, UserStatus
+from models import User
+from security import require_roles
+
 router = APIRouter()
 
 
@@ -42,12 +46,31 @@ def verify(body: AdminVerify, db: Session = Depends(get_db)):
     if not setting:
         return {"ok": False, "data": None, "msg": "系统未初始化"}
     if verify_password_hash(body.password, setting.value):
-        return {"ok": True, "data": None, "msg": "验证成功"}
+        from routers.auth import issue_token_pair
+        from services.audit_service import add_audit_log
+        user = db.query(User).filter(User.external_subject == "local:admin").first()
+        if not user:
+            user = User(
+                external_subject="local:admin",
+                name="系统管理员",
+                role=UserRole.ADMIN.value,
+                status=UserStatus.ACTIVE.value,
+            )
+            db.add(user)
+            db.flush()
+        data = issue_token_pair(db, user)
+        add_audit_log(db, user, "auth.admin_login", "user", user.id)
+        db.commit()
+        return {"ok": True, "data": data, "msg": "验证成功"}
     return {"ok": False, "data": None, "msg": "密码错误"}
 
 
 @router.put("/admin/password")
-def change_password(body: AdminChangePassword, db: Session = Depends(get_db)):
+def change_password(
+    body: AdminChangePassword,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value)),
+):
     from models import AdminSetting
     setting = db.query(AdminSetting).filter(AdminSetting.key == "password").first()
     if not setting:
@@ -62,7 +85,10 @@ def change_password(body: AdminChangePassword, db: Session = Depends(get_db)):
 
 
 @router.get("/admin/settings")
-def list_settings(db: Session = Depends(get_db)):
+def list_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value)),
+):
     """Get all non-sensitive admin settings."""
     from models import AdminSetting
     # smtp_pass 不可通过 API 读取，仅可写入
@@ -75,12 +101,18 @@ def list_settings(db: Session = Depends(get_db)):
 
 
 @router.put("/admin/settings")
-def update_settings(body: dict, db: Session = Depends(get_db)):
+def update_settings(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value)),
+):
     """Batch update admin settings (key-value pairs). Sensitive keys like 'password' are filtered."""
     from models import AdminSetting
-    SENSITIVE_KEYS = {"password", "smtp_pass", "smtp_user"}
+    SENSITIVE_KEYS = {"password"}
     for key, value in body.items():
         if key in SENSITIVE_KEYS:
+            continue
+        if key == "smtp_pass" and not value:
             continue
         setting = db.query(AdminSetting).filter(AdminSetting.key == key).first()
         if setting:
@@ -92,7 +124,11 @@ def update_settings(body: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/admin/test-email")
-def test_email(body: TestEmailRequest, db: Session = Depends(get_db)):
+def test_email(
+    body: TestEmailRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMIN.value)),
+):
     """Send a test email to verify SMTP configuration."""
     from services.email_service import send_test_email
     result = send_test_email(db, body.email)

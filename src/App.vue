@@ -15,7 +15,8 @@
         @toggle-import="showImportModal = true"
         @toggle-warehouse="toggleView"
         @toggle-reports="toggleReports"
-        @toggle-stocktake="toggleStocktake"
+@toggle-stocktake="toggleStocktake"
+        @toggle-applications="toggleApplications"
       />
 
     <AlertBanner
@@ -58,9 +59,15 @@
       @back="currentView = 'all'"
     />
 
-    <!-- Stocktake Page -->
+<!-- Stocktake Page -->
     <StocktakePage
       v-if="currentView === 'stocktake'"
+      @back="currentView = 'all'"
+    />
+
+    <BorrowApplicationsPage
+      v-if="currentView === 'applications'"
+      :toast="toast"
       @back="currentView = 'all'"
     />
 
@@ -107,7 +114,7 @@
       </template>
     </div>
 
-    <HistorySection v-if="currentView === 'all'" :history="recentHistory" :materials="materials" />
+    <HistorySection v-if="currentView === 'all'" :history="recentHistory" :materials="allMaterials" />
     <footer class="footer">© 2026 一站式物资管理系统 · 数据已持久化存储</footer>
   </div>
 
@@ -180,6 +187,7 @@
     @save-threshold="handleSaveThreshold"
     @toggle-locations="showLocationManager = true"
     @toggle-import="showImportModal = true"
+    @toggle-users="showUserManager = true"
   />
 
   <MaterialArchiveForm
@@ -198,6 +206,12 @@
   <LocationManager
     :visible="showLocationManager"
     @close="showLocationManager = false"
+  />
+
+  <UserManager
+    :visible="showUserManager"
+    :toast="toast"
+    @close="showUserManager = false"
   />
 
   <InboundModal
@@ -233,6 +247,7 @@ import AdminPanel from './components/AdminPanel.vue'
 import MaterialArchiveForm from './components/MaterialArchiveForm.vue'
 import ImportExcelModal from './components/ImportExcelModal.vue'
 import LocationManager from './components/LocationManager.vue'
+import UserManager from './components/UserManager.vue'
 import WarehousePage from './components/WarehousePage.vue'
 import WarehouseDetail from './components/WarehouseDetail.vue'
 import InboundModal from './components/InboundModal.vue'
@@ -240,8 +255,10 @@ import TransferModal from './components/TransferModal.vue'
 import AlertBanner from './components/AlertBanner.vue'
 import ReportsPage from './components/ReportsPage.vue'
 import StocktakePage from './components/StocktakePage.vue'
+import BorrowApplicationsPage from './components/BorrowApplicationsPage.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import QRCode from 'qrcode'
+import { clearAuthTokens } from './api/client.js'
 
 const {
   allMaterials, durableMaterials, consumableMaterials,
@@ -353,7 +370,7 @@ function escHtml(s) {
 function printQR(itemCode) {
   const safeCode = escHtml(itemCode)
   const canvas = document.createElement('canvas')
-  QRCode.toCanvas(canvas, `MATERIAL:${remoteMaterialId.value}:${itemCode}`, {
+  QRCode.toCanvas(canvas, `ITEM:${itemCode}`, {
     width: 250,
     color: { dark: '#1a2332', light: '#ffffff' }
   }).then(() => {
@@ -382,7 +399,7 @@ function printAllQR() {
       div.innerHTML = `<div class="code">🔑 ${safeCode}</div>`
       grid.appendChild(div)
       const cv = w.document.createElement('canvas')
-      QRCode.toCanvas(cv, `MATERIAL:${remoteMaterialId.value}:${i.code}`, { width: 130, color: { dark: '#1a2332', light: '#ffffff' } }).then(() => div.appendChild(cv))
+      QRCode.toCanvas(cv, `ITEM:${i.code}`, { width: 130, color: { dark: '#1a2332', light: '#ffffff' } }).then(() => div.appendChild(cv))
     })
     setTimeout(() => w.print(), 800)
   }, 300)
@@ -467,7 +484,10 @@ async function handleAdminLogin(password) {
   }
 }
 
-function handleAdminLogout() { adminLoggedIn.value = false }
+function handleAdminLogout() {
+  adminLoggedIn.value = false
+  clearAuthTokens()
+}
 
 async function handleSaveTotal(materialId, newTotal) {
   const result = await updateTotalQuantity(materialId, newTotal)
@@ -507,6 +527,7 @@ function handleImported() {
 
 // Location manager
 const showLocationManager = ref(false)
+const showUserManager = ref(false)
 
 // Warehouse view
 const currentView = ref('all')
@@ -530,6 +551,10 @@ function toggleReports() {
 
 function toggleStocktake() {
   currentView.value = currentView.value === 'stocktake' ? 'all' : 'stocktake'
+}
+
+function toggleApplications() {
+  currentView.value = currentView.value === 'applications' ? 'all' : 'applications'
 }
 
 function openWarehouseDetail(warehouseId) {
@@ -573,5 +598,6 @@ document.addEventListener('keydown', (e) => {
   inboundModalVisible.value = false
   transferModalVisible.value = false
   showImportModal.value = false
+  showUserManager.value = false
 })
 </script>

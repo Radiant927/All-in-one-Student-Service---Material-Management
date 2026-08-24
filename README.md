@@ -1,6 +1,26 @@
 # 一站式物资管理系统
 
-基于 Vue 3 + Vite 构建的前端物资管理系统，面向校内物资的入库、存储、领用、回收全流程管理。
+面向校内物资入库、存储、申请、领用和回收全流程的一站式服务系统，包含 Vue 3 管理端、FastAPI 后端和 uni-app 学生小程序。
+
+## 当前实现状态
+
+- 多仓库、储位、入库、调拨、回收仓优先消耗和个体物资追踪
+- PostgreSQL / SQLite、Docker、Alembic 数据迁移和每日数据库备份
+- 动态库存预警、补货报表、Excel 导入导出和可配置定时邮件
+- 学生、操作员、管理员三类角色，访问令牌、刷新令牌和操作审计
+- 借用申请、库存预留、审核、现场领取、归还验收和超时释放闭环
+- `MATERIAL:{material_public_id}`、`ITEM:{item_code}` 统一二维码及旧标签兼容
+- 无线扫码枪输入页面和微信小程序摄像头扫码
+- uni-app 学生端：查询、扫码、提交申请、查看进度、发起归还
+
+借用申请状态统一为：
+
+```text
+submitted → approved → picked_up → return_pending → returned
+     └────→ rejected / cancelled        approved → expired
+```
+
+审核通过时只预留库存；现场确认领取时才执行 `borrow` 库存流水；归还验收时执行 `return`。
 
 ## 业务流程
 
@@ -29,7 +49,7 @@
 - **借用记录**：可折叠查看历史借还记录
 - **管理员面板**：密码登录、修改物资总数和低库存阈值
 
-## 待开发功能
+## 工作方向（仅作为后续指引）
 
 ### 第一阶段：数据基建与盘点
 
@@ -75,10 +95,29 @@
 ## 技术栈
 
 - Vue 3 (Composition API + `<script setup>`)
-- Vite
+- Vite + Vitest
 - qrcode
+- FastAPI + SQLAlchemy + Alembic
+- SQLite / PostgreSQL
+- uni-app + Vue 3（微信小程序）
+- Docker Compose
 
-## 启动
+## 本地启动
+
+### 后端
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+Copy-Item .env.example .env
+.\.venv\Scripts\alembic.exe -c alembic.ini upgrade head
+Set-Location backend
+..\.venv\Scripts\uvicorn.exe main:app --reload
+```
+
+开发环境可以在 `.env` 中启用 `AUTH_PROVIDER=mock` 和 `MOCK_AUTH_ENABLED=true`。生产环境会强制禁用模拟认证，并要求配置学校认证适配器与 `JWT_SECRET`。
+
+### Web 管理端
 
 ```bash
 npm install
@@ -87,12 +126,47 @@ npm run dev
 
 浏览器访问 `http://localhost:5173/`
 
+### 微信小程序
+
+```powershell
+Set-Location student-miniapp
+npm install
+Copy-Item .env.example .env
+npm run dev:mp-weixin
+```
+
+将生成目录导入微信开发者工具，并在 `student-miniapp/src/manifest.json` 填写真实微信 AppID。生产 API 必须使用 HTTPS 并加入微信合法请求域名。
+
 ## 构建
 
 ```bash
 npm run build
 npm run preview
 ```
+
+```powershell
+# 后端测试
+.\.venv\Scripts\python.exe -m pytest backend\tests -q
+
+# 管理端测试与构建
+npm run test
+npm run build
+
+# 微信小程序构建
+Set-Location student-miniapp
+npm run build:mp-weixin
+```
+
+## API 与权限
+
+- 登录：`POST /api/auth/login`、`POST /api/auth/refresh`、`POST /api/auth/logout`
+- 当前用户：`GET /api/me`
+- 借用申请：`/api/borrow-applications`
+- 扫码解析：`POST /api/scan/resolve`
+- 审计记录：`GET /api/audit-logs`（仅管理员）
+- 所有接口继续使用 `{ "ok": boolean, "data": ..., "msg": string }` 响应结构
+
+角色权限：学生只能管理自己的申请；操作员负责审核和现场确认；管理员额外负责系统设置、用户和审计。
 
 ## Git 协作流程
 
@@ -300,24 +374,19 @@ VS Code 的源代码管理面板可以完成上述所有操作：
 ## 项目结构
 
 ```
+backend/
+├── routers/                # FastAPI 接口
+├── services/               # 库存、申请、邮件和审计服务
+├── migrations/             # Alembic 迁移
+└── tests/                  # 后端自动化测试
 src/
-├── main.js                 # 入口
-├── App.vue                 # 根组件
-├── style.css               # 全局样式
-├── store/
-│   └── useStore.js         # 响应式状态管理
-└── components/
-    ├── AppHeader.vue       # 顶部导航
-    ├── StatsRow.vue        # 统计面板
-    ├── MaterialCard.vue    # 物资卡片
-    ├── HistorySection.vue  # 借用记录
-    ├── BorrowModal.vue     # 借出弹窗
-    ├── ReturnModal.vue     # 归还弹窗
-    ├── ManagementPage.vue  # 遥控器管理页面
-    ├── QRModal.vue         # 二维码弹窗
-    ├── AddRemoteModal.vue  # 添加遥控器
-    ├── ItemBorrowModal.vue # 单项借出
-    ├── ItemReturnModal.vue # 单项归还
-    ├── AdminPanel.vue      # 管理员面板
-    └── ToastContainer.vue  # Toast 通知
+├── api/                    # Web API 客户端
+├── components/             # Vue 管理端组件
+├── constants/              # 共享状态名称
+└── store/                  # 管理端状态
+student-miniapp/
+└── src/
+    ├── pages/              # uni-app 学生端页面
+    ├── services/           # 小程序请求与令牌刷新
+    └── constants/          # 小程序共享状态名称
 ```

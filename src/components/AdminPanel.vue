@@ -49,6 +49,7 @@
           <div class="admin-tools">
             <button class="btn-tool" @click="$emit('toggle-locations')">📍 储位管理</button>
             <button class="btn-tool" @click="$emit('toggle-import')">📥 导入 Excel</button>
+            <button class="btn-tool" @click="$emit('toggle-users')">👥 用户权限</button>
           </div>
 
           <h3 style="margin-top:20px;">📧 邮件通知设置</h3>
@@ -106,7 +107,7 @@ const props = defineProps({
   materials: Array
 })
 
-const emit = defineEmits(['close', 'login', 'logout', 'save-total', 'save-threshold', 'toggle-locations', 'toggle-import'])
+const emit = defineEmits(['close', 'login', 'logout', 'save-total', 'save-threshold', 'toggle-locations', 'toggle-import', 'toggle-users'])
 
 const password = ref('')
 const errorVisible = ref(false)
@@ -141,10 +142,10 @@ async function saveSmtp() {
     smtp_host: smtpConfig.host,
     smtp_port: String(smtpConfig.port),
     smtp_user: smtpConfig.user,
-    smtp_pass: smtpConfig.pass,
     smtp_from: smtpConfig.from,
     smtp_to: smtpConfig.to,
   }
+  if (smtpConfig.pass) data.smtp_pass = smtpConfig.pass
   const res = await updateSettings(data)
   smtpMsg.value = res.ok ? 'SMTP设置已保存' : '保存失败'
   smtpOk.value = res.ok
