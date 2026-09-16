@@ -238,10 +238,21 @@ class StocktakeCreate(BaseModel):
     note: str = ""
 
 class StocktakeEntryIn(BaseModel):
+    material_id: Optional[int] = None
+    warehouse_id: Optional[int] = None
+    location_id: Optional[int] = None
+    actual_quantity: int = Field(ge=0)
+
+
+class StocktakeSurplusEntryCreate(BaseModel):
     material_id: int
     warehouse_id: int
     location_id: Optional[int] = None
-    actual_quantity: int
+    actual_quantity: int = Field(ge=0)
+
+
+class StocktakeScanIn(BaseModel):
+    payload: str = Field(min_length=1, max_length=300)
 
 class StocktakeEntryOut(BaseModel):
     id: int

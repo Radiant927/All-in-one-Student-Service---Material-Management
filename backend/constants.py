@@ -34,5 +34,5 @@ TERMINAL_APPLICATION_STATUSES = {
     BorrowApplicationStatus.EXPIRED.value,
 }
 
-INVENTORY_ACTIONS = {"borrow", "return", "transfer", "inbound"}
+INVENTORY_ACTIONS = {"borrow", "return", "transfer", "inbound", "stocktake_adjust"}
 

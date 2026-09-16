@@ -62,7 +62,7 @@ class InventoryItem(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     material_id = Column(Integer, ForeignKey("materials.id"), nullable=False, index=True)
     code = Column(String(100), nullable=False, unique=True)
-    status = Column(String(20), nullable=False, default="available", index=True)  # available / borrowed
+    status = Column(String(20), nullable=False, default="available", index=True)  # available / borrowed / missing
     borrowed_by = Column(String(100), nullable=True)
     borrow_time = Column(String(30), nullable=True)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
@@ -119,10 +119,11 @@ class Stocktake(Base):
     __tablename__ = "stocktakes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    status = Column(String(20), nullable=False, default="in_progress", index=True)  # in_progress / completed
+    status = Column(String(20), nullable=False, default="in_progress", index=True)  # in_progress / completed / cancelled
     note = Column(String(500), default="")
     created_at = Column(String(30), nullable=False)
     completed_at = Column(String(30), nullable=True)
+    cancelled_at = Column(String(30), nullable=True)
 
     entries = relationship("StocktakeEntry", back_populates="stocktake", cascade="all, delete-orphan")
 
@@ -139,11 +140,34 @@ class StocktakeEntry(Base):
     book_quantity = Column(Integer, nullable=False, default=0)   # 账面数量
     actual_quantity = Column(Integer, nullable=True)             # 实际清点数量
     difference = Column(Integer, nullable=False, default=0)      # 差异 = actual - book
+    counted = Column(Boolean, nullable=False, default=False)      # 已明确完成该项清点
 
     stocktake = relationship("Stocktake", back_populates="entries")
     material = relationship("Material")
     warehouse = relationship("Warehouse")
     location = relationship("StorageLocation")
+    item_checks = relationship(
+        "StocktakeItemCheck", back_populates="entry", cascade="all, delete-orphan"
+    )
+
+
+class StocktakeItemCheck(Base):
+    """个体追踪盘点核对记录；既保存账面快照，也保存现场额外扫码。"""
+    __tablename__ = "stocktake_item_checks"
+    __table_args__ = (UniqueConstraint("stocktake_entry_id", "item_code"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    stocktake_entry_id = Column(
+        Integer, ForeignKey("stocktake_entries.id"), nullable=False, index=True
+    )
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=True, index=True)
+    item_code = Column(String(100), nullable=False)
+    expected = Column(Boolean, nullable=False, default=False)
+    scanned = Column(Boolean, nullable=False, default=False)
+    scanned_at = Column(String(30), nullable=True)
+
+    entry = relationship("StocktakeEntry", back_populates="item_checks")
+    inventory_item = relationship("InventoryItem")
 
 
 

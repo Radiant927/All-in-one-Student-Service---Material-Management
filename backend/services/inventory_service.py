@@ -15,7 +15,10 @@ def get_material_inventory_summary(db: Session, material_id: int):
             InventoryItem.material_id == material_id,
             InventoryItem.status == "borrowed"
         ).count()
-        available = total - borrowed
+        available = db.query(InventoryItem).filter(
+            InventoryItem.material_id == material_id,
+            InventoryItem.status == "available"
+        ).count()
     else:
         total = db.query(func.sum(InventoryBatch.quantity)).filter(
             InventoryBatch.material_id == material_id
@@ -93,8 +96,12 @@ def borrow_material(db: Session, material_id: int, quantity: int, borrower: str,
         ).with_for_update().first()
         if not item:
             return {"ok": False, "msg": f"遥控器 {item_code} 不存在"}
-        if item.status == "borrowed":
-            return {"ok": False, "msg": f"遥控器 {item_code} 已被借出"}
+        if item.status != "available":
+            if item.status == "borrowed":
+                return {"ok": False, "msg": f"遥控器 {item_code} 已被借出"}
+            if item.status == "missing":
+                return {"ok": False, "msg": f"遥控器 {item_code} 盘点缺失，找回并确认入库后才能借出"}
+            return {"ok": False, "msg": f"遥控器 {item_code} 当前状态不可借出"}
         from models import InventoryReservation
         reservation_query = db.query(InventoryReservation).filter(
             InventoryReservation.material_id == material_id,
