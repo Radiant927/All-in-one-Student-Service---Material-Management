@@ -9,6 +9,7 @@
             <span>总数: <span class="stat-total">{{ totalCount }}</span></span>
             <span>可借: <span class="stat-available">{{ availableCount }}</span></span>
             <span>已借出: <span class="stat-borrowed">{{ borrowedCount }}</span></span>
+            <span>盘点缺失: <span class="stat-missing">{{ missingCount }}</span></span>
           </div>
         </div>
         <div class="mgmt-topbar-right">
@@ -33,7 +34,7 @@
         >
           <div class="remote-code">🔑 {{ item.code }}</div>
           <span class="remote-status" :class="item.status">
-            {{ item.status === 'available' ? '✅ 可用' : '❌ 已借出' }}
+            {{ statusLabel(item.status) }}
           </span>
           <div v-if="item.status === 'borrowed'" class="remote-borrower">
             借用人: <strong>{{ item.borrowedBy || '未知' }}</strong>
@@ -44,7 +45,7 @@
           <div class="remote-actions">
             <button class="btn-xs qr-item" @click="$emit('show-qr', item.code)">🔳 二维码</button>
             <button v-if="item.status === 'available'" class="btn-xs borrow-item" @click="$emit('borrow-item', item.code)">📤 借出</button>
-            <button v-else class="btn-xs return-item" @click="$emit('return-item', item.code)">📥 归还</button>
+            <button v-if="item.status === 'borrowed'" class="btn-xs return-item" @click="$emit('return-item', item.code)">📥 归还</button>
             <button v-if="item.status === 'available'" class="btn-xs danger" @click="$emit('delete-item', item.code)">🗑️</button>
           </div>
         </div>
@@ -79,6 +80,7 @@ const items = computed(() => props.material?.items || [])
 const totalCount = computed(() => items.value.length)
 const availableCount = computed(() => items.value.filter(i => i.status === 'available').length)
 const borrowedCount = computed(() => items.value.filter(i => i.status === 'borrowed').length)
+const missingCount = computed(() => items.value.filter(i => i.status === 'missing').length)
 
 const filteredItems = computed(() => {
   if (!searchQuery.value.trim()) return items.value
@@ -87,6 +89,14 @@ const filteredItems = computed(() => {
 })
 
 function onSearch() {}
+
+function statusLabel(status) {
+  return {
+    available: '✅ 可用',
+    borrowed: '📤 已借出',
+    missing: '⚠️ 盘点缺失'
+  }[status] || `⚠️ ${status}`
+}
 
 function formatTime(iso) {
   const d = new Date(iso)
@@ -133,6 +143,7 @@ function formatTime(iso) {
 .mgmt-stats span { white-space: nowrap; }
 .stat-available { color: #059669; font-weight: 600; }
 .stat-borrowed { color: #d97706; font-weight: 600; }
+.stat-missing { color: #dc2626; font-weight: 600; }
 .stat-total { color: #1a2332; font-weight: 600; }
 .mgmt-topbar-right { display: flex; gap: 8px; align-items: center; }
 
@@ -177,10 +188,12 @@ function formatTime(iso) {
 .remote-item-card:hover { border-color: #ccd5e0; box-shadow: 0 4px 16px rgba(0,0,0,0.06); transform: translateY(-2px); }
 .remote-item-card.available { border-left: 4px solid #22c55e; }
 .remote-item-card.borrowed { border-left: 4px solid #ef4444; background: #fefcfb; }
+.remote-item-card.missing { border-left: 4px solid #f59e0b; background: #fffbeb; }
 .remote-code { font-size: 1rem; font-weight: 800; color: #1a2332; }
 .remote-status { font-size: 0.75rem; font-weight: 700; padding: 4px 12px; border-radius: 12px; display: inline-block; }
 .remote-status.available { background: #d1fae5; color: #065f46; }
 .remote-status.borrowed { background: #fee2e2; color: #991b1b; }
+.remote-status.missing { background: #fef3c7; color: #92400e; }
 .remote-borrower { font-size: 0.78rem; color: #5a6b7d; }
 .remote-borrower strong { color: #1a2332; }
 .remote-time { font-size: 0.7rem; color: #8e9aab; }

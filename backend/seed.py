@@ -69,6 +69,7 @@ def seed():
             pens = db.query(Material).filter_by(name="笔").first()
             loc_a12 = loc_map.get("A-1-2")
             loc_a21 = loc_map.get("A-2-1")
+            loc_b11 = loc_map.get("B-1-1")
 
             if water and loc_a12:
                 # 初始总量50桶，已借出12桶，现余38桶
@@ -88,7 +89,8 @@ def seed():
                 # 初始总量60支，已借出18支（其中5支从回收仓借出），现余42支；回收仓余5支
                 db.add(InventoryBatch(material_id=pens.id, warehouse_id=w1.id, location_id=loc_a21.id,
                                       quantity=55, created_at=now, updated_at=now))
-                db.add(InventoryBatch(material_id=pens.id, warehouse_id=w2.id, location_id=loc_a21.id,
+                db.add(InventoryBatch(material_id=pens.id, warehouse_id=w2.id,
+                                      location_id=loc_b11.id if loc_b11 else None,
                                       quantity=5, created_at=now, updated_at=now))
                 db.add(BorrowHistory(material_id=pens.id, action="borrow", quantity=13,
                                      borrower="系统初始化", warehouse_id=w1.id, created_at=now))
